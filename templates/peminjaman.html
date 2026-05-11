@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Daftar Peminjaman</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 40px; background-color: #f4f7f6; }
+        .container { background: white; padding: 30px; border-radius: 12px; max-width: 900px; margin: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; border-bottom: 2px solid #f1c40f; padding-bottom: 10px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
+        th { background-color: #f1c40f; color: #2c3e50; }
+        .status-badge { background: #2ecc71; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; }
+        .btn-back { display: inline-block; margin-bottom: 20px; text-decoration: none; color: #3498db; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="btn-back">← Kembali ke Pencarian</a>
+        <h2>Daftar Peminjaman Aktif</h2>
+        <table>
+            <tr>
+                <th>Tanggal Pinjam</th>
+                <th>Nama Siswa</th>
+                <th>Judul Buku</th>
+                <th>Status</th>
+            </tr>
+            {% for p in peminjaman %}
+            <tr>
+                <td>{{ p.tgl_pinjam }}</td>
+                <td>{{ p.nama }}</td>
+                <td>{{ p.judul }}</td>
+                <td><span class="status-badge">{{ p.status }}</span></td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
