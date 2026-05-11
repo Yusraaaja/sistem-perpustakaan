@@ -2,87 +2,104 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Perpustakaan Digital</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Perpustakaan Digital</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 40px; background-color: #f4f7f6; color: #333; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
-        h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-        
-        /* Form Styling */
-        .form-group { margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
-        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; flex: 1; min-width: 150px; }
-        .btn-add { background-color: #3498db; color: white; border: none; cursor: pointer; font-weight: bold; }
-        .btn-add:hover { background-color: #2980b9; }
-
-        /* Table Styling */
-        table { border-collapse: collapse; width: 100%; margin-top: 30px; background: white; }
-        th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
-        th { background-color: #34495e; color: white; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        .tag-rak { background: #e67e22; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; }
+        body { background-color: #f8f9fa; }
+        .navbar { background-color: #2c3e50; }
+        .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .shelf-badge { background-color: #e67e22; color: white; }
     </style>
 </head>
 <body>
-    <h1>Admin Dashboard</h1>
-    <nav style="margin-bottom: 20px;">
-        <a href="/" style="margin-right: 15px; font-weight: bold; text-decoration: none; color: #3498db;">Koleksi Buku</a>
-        <a href="/peminjaman" style="font-weight: bold; text-decoration: none; color: #e67e22;">Daftar Peminjaman</a>
-    </nav>
+
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
     <div class="container">
-        <h2>Tambah Buku Baru</h2>
-        <form action="/add" method="POST" class="form-group">
-            <input type="text" name="judul" placeholder="Judul Buku" required>
-            <input type="text" name="penulis" placeholder="Penulis">
-            <input type="text" name="kategori" placeholder="Kategori (Misal: Sejarah)">
-            <input type="text" name="kode_rak" placeholder="Rak (A/B/C)" style="max-width: 80px;">
-            <input type="number" name="baris_rak" placeholder="Baris" style="max-width: 80px;">
-            <input type="number" name="stok" placeholder="Stok" style="max-width: 80px;">
-            <button type="submit" class="btn-add">Simpan Buku</button>
-        </form>
-
-        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
-
-        <h2>Pencarian & Koleksi</h2>
-        <form action="/search" method="GET" class="form-group">
-            <input type="text" name="query" placeholder="Cari judul buku..." required>
-            <button type="submit" style="background-color: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">Cari</button>
-            <a href="/" style="text-decoration: none; padding: 10px; color: #7f8c8d;">Reset</a>
-        </form>
-
-        {% if results %}
-            <table>
-                <tr>
-                    <th>Judul</th>
-                    <th>Penulis</th>
-                    <th>Kategori</th>
-                    <th>Lokasi Rak</th>
-                    <th>Stok</th>
-                    <th>Aksi</th>
-                </tr>
-                {% for buku in results %}
-                <tr>
-                    <td><strong>{{ buku.judul }}</strong></td>
-                    <td>{{ buku.penulis }}</td>
-                    <td>{{ buku.kategori }}</td>
-                    <td><span class="tag-rak">Rak {{ buku.kode_rak }} - Baris {{ buku.baris_rak }}</span></td>
-                    <td>{{ buku.stok }}</td>
-                    <td>
-                        {% if buku.stok > 0 %}
-                        <form action="/pinjam/{{ buku.id }}" method="POST" style="display:inline-flex; gap:5px;">
-                            <input type="text" name="nama_peminjam" placeholder="Nama Siswa" required style="padding:5px; font-size:0.8em; min-width:100px;">
-                            <button type="submit" style="background-color: #f1c40f; border:none; border-radius:4px; cursor:pointer; padding:5px 10px; font-weight:bold;">Pinjam</button>
-                        </form>
-                        {% else %}
-                        <span style="color:red; font-weight:bold;">Habis</span>
-                        {% endif %}
-
-                        <a href="/edit/{{ buku.id }}" style="margin-left:15px; text-decoration:none; color:#3498db;">Edit</a>
-                        <a href="/delete/{{ buku.id }}" style="margin-left:10px; text-decoration:none; color:#e74c3c;" onclick="return confirm('Hapus?')">Hapus</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
-        {% endif %}
+        <a class="navbar-brand fw-bold" href="/">📚 MyLibrary</a>
+        <div class="navbar-nav">
+            <a class="nav-link active" href="/">Koleksi Buku</a>
+            <a class="nav-link" href="/peminjaman">Daftar Peminjaman</a>
+        </div>
     </div>
+</nav>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card p-4">
+                <h5 class="card-title fw-bold mb-3">Tambah Buku Baru</h5>
+                <form action="/tambah" method="POST"> <div class="mb-2">
+                        <input type="text" name="judul" class="form-control" placeholder="Judul Buku" required>
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" name="penulis" class="form-control" placeholder="Penulis">
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <input type="text" name="kode_rak" class="form-control" placeholder="Rak (A/B)">
+                        </div>
+                        <div class="col-6">
+                            <input type="number" name="baris_rak" class="form-control" placeholder="Baris">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <input type="number" name="stok" class="form-control" placeholder="Stok" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Simpan Buku</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card p-4">
+                <h5 class="card-title fw-bold mb-3">Pencarian Koleksi</h5>
+                <form action="/cari" method="GET" class="d-flex gap-2 mb-4">
+                    <input type="text" name="query" class="form-control" placeholder="Ketik judul buku..." required>
+                    <button type="submit" class="btn btn-success px-4">Cari</button>
+                    <a href="/" class="btn btn-outline-secondary">Reset</a>
+                </form>
+
+                {% if hasil %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Buku</th>
+                                <th>Lokasi</th>
+                                <th>Stok</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for b in hasil %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">{{ b.judul }}</div>
+                                    <small class="text-muted">{{ b.penulis }}</small>
+                                </td>
+                                <td><span class="badge shelf-badge">Rak {{ b.kode_rak }} - {{ b.baris_rak }}</span></td>
+                                <td>{{ b.stok }}</td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-light border dropdown-toggle" data-bs-toggle="dropdown">Opsi</button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="/edit/{{ b.id }}">Edit</a></li>
+                                            <li><a class="dropdown-item text-danger" href="/hapus/{{ b.id }}" onclick="return confirm('Hapus buku?')">Hapus</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

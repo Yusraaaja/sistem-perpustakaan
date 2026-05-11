@@ -14,7 +14,7 @@ def index():
 
 # Rute Pencarian
 @app.route('/search')
-def search():
+def cari_buku():
     query = request.args.get('query')
     results = []
     if query:
