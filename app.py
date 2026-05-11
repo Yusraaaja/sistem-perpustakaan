@@ -188,5 +188,19 @@ def koleksi_lengkap():
     conn.close()
     return render_template('koleksi.html', books=all_books)
 
+@app.route('/search_database')
+def search_database():
+    query = request.args.get('query')
+    results = []
+    if query:
+        conn = get_db_connection()
+        # Mencari buku dan menampilkan hasilnya di format tabel koleksi
+        results = conn.execute('SELECT * FROM buku WHERE judul LIKE ? OR penulis LIKE ?', 
+                               ('%' + query + '%', '%' + query + '%')).fetchall()
+        conn.close()
+    
+    # Kita kirim hasil pencarian ke koleksi.html menggunakan variabel 'books'
+    return render_template('koleksi.html', books=results, query=query)
+
 if __name__ == '__main__':
     app.run(debug=True)

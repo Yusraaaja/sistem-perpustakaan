@@ -88,6 +88,40 @@
                     <div class="d-grid mt-2">
                         <a href="#areaPinjam" class="btn btn-warning btn-lg fw-bold text-dark"><i class="bi bi-book"></i> Pinjam Buku Ini Sekarang</a>
                     </div>
+                    <div id="areaPinjam" class="card p-4 mb-5 border-primary shadow mt-4">
+                        <h5 class="fw-bold text-primary">Form Peminjaman</h5>
+                        <form action="/pinjam/{{ buku.id }}" method="POST">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="fw-bold small">Tipe Peminjam</label>
+                                    <select name="tipe_user" class="form-select" required>
+                                        <option value="Murid">Murid</option>
+                                        <option value="Guru">Guru</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8 mb-3">
+                                    <label class="fw-bold small">Nama Lengkap</label>
+                                    <input type="text" name="nama_peminjam" class="form-control" placeholder="Masukkan nama peminjam" required>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="fw-bold small">Kelas (Pilih '-' jika Guru)</label>
+                                    <select name="kelas" class="form-select" required>
+                                        <option value="-">- (Khusus Guru/Staff)</option>
+                                        <option value="X">Kelas 10 (X)</option>
+                                        <option value="XI">Kelas 11 (XI)</option>
+                                        <option value="XII">Kelas 12 (XII)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="fw-bold small">Jurusan</label>
+                                    <input type="text" name="jurusan" class="form-control" placeholder="Contoh: RPL" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold">Konfirmasi Pinjam Buku</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
