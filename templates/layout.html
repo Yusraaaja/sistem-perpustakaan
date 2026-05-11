@@ -10,6 +10,13 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
     <div class="container">
         <a class="navbar-brand fw-bold" href="/">📚 E-Perpus</a>
+        <div class="navbar-nav ms-auto">
+            {% if session.get('logged_in') %}
+                <a class="nav-link text-danger" href="/logout">Logout</a>
+            {% else %}
+                <a class="nav-link text-primary fw-bold" href="{{ url_for('login') }}">Login Admin</a>
+            {% endif %}
+        </div>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>

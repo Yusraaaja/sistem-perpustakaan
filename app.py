@@ -1,14 +1,42 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 import sqlite3
 from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
 
+app = Flask(__name__)
+
+app.secret_key = 'kuncirahasia'
+
+# Data login admin (Sederhana dulu, nanti bisa dipindah ke database)
+ADMIN_USERNAME = 'admin'
+ADMIN_PASSWORD = '123' 
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['logged_in'] = True
+            flash('Selamat datang, Admin!', 'success')
+            return redirect(url_for('koleksi_lengkap'))
+        else:
+            flash('Username atau password salah!', 'danger')
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    flash('Anda telah keluar.', 'info')
+    return redirect(url_for('index'))
+
 # Konfigurasi unggahan file
 UPLOAD_FOLDER = 'static/covers' # Folder tempat menyimpan gambar
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'} # Ekstensi file yang diizinkan
 
-app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = 'supersecretkey' # Diperlukan untuk flash message
 
@@ -40,6 +68,9 @@ def cari_buku():
 
 @app.route('/add', methods=['POST'])
 def tambah_buku():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
     judul = request.form.get('judul')
     penulis = request.form.get('penulis')
     kategori = request.form.get('kategori')
@@ -61,6 +92,9 @@ def tambah_buku():
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit_buku(id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
     conn = get_db_connection()
     book = conn.execute('SELECT * FROM buku WHERE id = ?', (id,)).fetchone()
 
@@ -80,6 +114,9 @@ def edit_buku(id):
 # UPDATE FUNGSI HAPUS: Supaya tetap di halaman terakhir
 @app.route('/delete/<int:id>')
 def hapus_buku(id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
     conn = get_db_connection()
     conn.execute('DELETE FROM buku WHERE id = ?', (id,))
     conn.commit()
