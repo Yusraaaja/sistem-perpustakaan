@@ -1,105 +1,37 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Perpustakaan Digital</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; }
-        .navbar { background-color: #2c3e50; }
-        .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .shelf-badge { background-color: #e67e22; color: white; }
-    </style>
-</head>
-<body>
+{% extends 'layout.html' %}
+{% block content %}
+<div class="card shadow-sm p-4">
+    <h4 class="fw-bold mb-3">Pencarian Cepat</h4>
+    <form action="/search" method="GET" class="d-flex mb-4">
+        <input type="text" name="query" class="form-control me-2" placeholder="Ketik judul buku..." value="{{ query or '' }}">
+        <button type="submit" class="btn btn-primary px-4">Cari</button>
+    </form>
 
-<nav class="navbar navbar-expand-lg navbar-dark mb-4">
-    <div class="container">
-        <a class="navbar-brand fw-bold" href="/">📚 MyLibrary</a>
-        <div class="navbar-nav">
-            <a class="nav-link active" href="/">Koleksi Buku</a>
-            <a class="nav-link" href="/peminjaman">Daftar Peminjaman</a>
-        </div>
+    {% if results %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Judul Buku (Klik untuk Detail)</th>
+                    <th>Penulis</th>
+                    <th>Stok</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in results %}
+                <tr>
+                    <td>
+                        <a href="/buku/{{ b.id }}" class="text-decoration-none fw-bold text-primary">
+                            {{ b.judul }}
+                        </a>
+                    </td>
+                    <td>{{ b.penulis }}</td>
+                    <td><span class="badge bg-success">{{ b.stok }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-</nav>
-
-<div class="container">
-    <div class="row">
-        <div class="col-md-4 mb-4">
-            <div class="card p-4">
-                <h5 class="card-title fw-bold mb-3">Tambah Buku Baru</h5>
-                <form action="/tambah" method="POST"> <div class="mb-2">
-                        <input type="text" name="judul" class="form-control" placeholder="Judul Buku" required>
-                    </div>
-                    <div class="mb-2">
-                        <input type="text" name="penulis" class="form-control" placeholder="Penulis">
-                    </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col-6">
-                            <input type="text" name="kode_rak" class="form-control" placeholder="Rak (A/B)">
-                        </div>
-                        <div class="col-6">
-                            <input type="number" name="baris_rak" class="form-control" placeholder="Baris">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <input type="number" name="stok" class="form-control" placeholder="Stok" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">Simpan Buku</button>
-                </form>
-            </div>
-        </div>
-
-        <div class="col-md-8">
-            <div class="card p-4">
-                <h5 class="card-title fw-bold mb-3">Pencarian Koleksi</h5>
-                <form action="/cari" method="GET" class="d-flex gap-2 mb-4">
-                    <input type="text" name="query" class="form-control" placeholder="Ketik judul buku..." required>
-                    <button type="submit" class="btn btn-success px-4">Cari</button>
-                    <a href="/" class="btn btn-outline-secondary">Reset</a>
-                </form>
-
-                {% if hasil %}
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Buku</th>
-                                <th>Lokasi</th>
-                                <th>Stok</th>
-                                <th>Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for b in hasil %}
-                            <tr>
-                                <td>
-                                    <div class="fw-bold">{{ b.judul }}</div>
-                                    <small class="text-muted">{{ b.penulis }}</small>
-                                </td>
-                                <td><span class="badge shelf-badge">Rak {{ b.kode_rak }} - {{ b.baris_rak }}</span></td>
-                                <td>{{ b.stok }}</td>
-                                <td>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-light border dropdown-toggle" data-bs-toggle="dropdown">Opsi</button>
-                                        <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" href="/edit/{{ b.id }}">Edit</a></li>
-                                            <li><a class="dropdown-item text-danger" href="/hapus/{{ b.id }}" onclick="return confirm('Hapus buku?')">Hapus</a></li>
-                                        </ul>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+    {% endif %}
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% endblock %}

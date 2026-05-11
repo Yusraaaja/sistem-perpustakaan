@@ -1,0 +1,60 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm mb-4 text-center p-4">
+            <div class="bg-light mx-auto mb-3" style="width: 200px; height: 300px; border: 2px dashed #ddd; line-height: 300px;">
+                <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm shadow-sm">
+                    <i class="bi bi-arrow-left"></i> Kembali ke Halaman Sebelumnya
+                </a>
+            </div>
+            
+            <div class="card shadow-sm mb-4 text-center p-4 border-0">
+                <h2 class="fw-bold">{{ buku.judul }}</h2>
+                <p class="text-muted">Karya: {{ buku.penulis }} | Kategori: {{ buku.kategori }}</p>
+                <hr>
+                <div class="row text-start">
+                    <div class="col-6"><strong>Rak:</strong> {{ buku.kode_rak }}</div>
+                    <div class="col-6"><strong>Baris:</strong> {{ buku.baris_rak }}</div>
+                    <div class="col-12 mt-2"><strong>Tersedia:</strong> <span class="badge bg-success">{{ buku.stok }} Buku</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-4 mb-5 border-primary">
+            <h5 class="fw-bold text-primary">Form Peminjaman</h5>
+            <form action="/pinjam/{{ buku.id }}" method="POST">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label>Status</label>
+                        <select name="tipe_user" class="form-select" required>
+                            <option value="Murid">Murid</option>
+                            <option value="Guru">Guru</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8 mb-3">
+                        <label>Nama Lengkap</label>
+                        <input type="text" name="nama_peminjam" class="form-control" placeholder="Nama Anda" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small">Kelas (Pilih '-' jika Guru)</label>
+                        <select name="kelas" class="form-select" required>
+                            <option value="-">- (Khusus Guru/Staff)</option>
+                            <option value="X">Kelas 10 (X)</option>
+                            <option value="XI">Kelas 11 (XI)</option>
+                            <option value="XII">Kelas 12 (XII)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small">Jurusan/Status</label>
+                        <input type="text" name="jurusan" class="form-control" placeholder="Staff/Umum (Jika guru umum tulis bidang mengajarnya)" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Konfirmasi Pinjam</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
