@@ -159,5 +159,27 @@ def daftar_peminjaman():
     conn.close()
     return render_template('peminjaman.html', peminjaman=peminjaman)
 
+# Rute Pengembalian
+@app.route('/return/<int:peminjaman_id>')
+def kembali_buku(peminjaman_id):
+    conn = get_db_connection()
+
+    # 1. cari data peminjaman untuk mendapatkan id_buku
+    peminjaman = conn.execute('SELECT id_buku FROM peminjaman WHERE id = ?', (peminjaman_id,)).fetchone()
+
+    if peminjaman:
+        id_buku = peminjaman['id_buku']
+
+        # 2. update status peminjaman jadi 'Kembali'
+        conn.execute('UPDATE peminjaman SET status = ? WHERE id = ?', ('Kembali', peminjaman_id))
+
+        # 3. tambah stok buku (+1)
+        conn.execute('UPDATE buku SET stok = stok + 1 WHERE id = ?', (id_buku,))
+
+        conn.commit()
+
+    conn.close()
+    return redirect(url_for('daftar_peminjaman'))
+
 if __name__ == '__main__':
     app.run(debug=True)

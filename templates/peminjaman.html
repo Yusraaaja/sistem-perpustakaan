@@ -31,6 +31,18 @@
                 <td>{{ p.nama }}</td>
                 <td>{{ p.judul }}</td>
                 <td><span class="status-badge">{{ p.status }}</span></td>
+                <td>
+                    {% if p.status == 'Dipinjam' %}
+                        <span class="status-badge" style="background-color: #e67e22;">Dipinjam</span>
+                        <a href="/return/{{ p.id }}" 
+                        style="margin-left: 10px; color: #2ecc71; text-decoration: none; font-weight: bold;"
+                        onclick="return confirm('Konfirmasi pengembalian buku?')">
+                        [ Kembalikan ]
+                        </a>
+                    {% else %}
+                        <span class="status-badge" style="background-color: #95a5a6;">Selesai</span>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </table>
