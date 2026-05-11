@@ -12,6 +12,7 @@ def get_db_connection():
 def index():
     return render_template('index.html')
 
+# Rute Pencarian
 @app.route('/search')
 def search():
     query = request.args.get('query')
@@ -26,6 +27,7 @@ def search():
 
 from datetime import datetime, timedelta
 
+# Rute Peminjaman
 @app.route('/pinjam', methods=['POST'])
 def pinjam():
     id_buku = request.form.get('id_buku')
@@ -52,6 +54,7 @@ def pinjam():
 
 from flask import redirect, url_for
 
+# Rute tambah buku
 @app.route('/add', methods=['POST'])
 def add_book():
     # Mengambil data dari form
@@ -72,6 +75,40 @@ def add_book():
         conn.close()
 
     return redirect(url_for('index')) # Kembali ke halaman utama setelah disimpan
+
+# Rute Hapus
+@app.route('/delete/<int:id>')
+def delete_book(id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM buku WHERE id = ?', (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('index'))
+
+# Rute Edit
+@app.route('/edit/<int:id>')
+def edit_book(id):
+    conn = get_db_connection()
+    book = conn.execute('SELECT * FROM buku WHERE id = ?', (id,)).fetchone()
+
+    if request.method == 'POST':
+        judul = request.form['judul']
+        penulis = request.form['penulis']
+        kategori = request.form['kategori']
+        kode_rak = request.form['kode_rak']
+        baris_rak = request.form['baris_rak']
+        stok = request.form['stok']
+
+        conn.execute('''
+            UPDATE buku SET judul=?, penulis=?, kategori=?, kode_rak=?, baris_rak=?, stok=?
+            WHERE id=?
+        ''', (judul, penulis, kategori, kode_rak, baris_rak, stok, id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('index'))
+    
+    conn.close()
+    return render_template('edit.html', buku=book)
 
 if __name__ == '__main__':
     app.run(debug=True)

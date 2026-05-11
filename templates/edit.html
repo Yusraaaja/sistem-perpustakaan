@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Buku</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 40px; background-color: #f4f7f6; }
+        .container { background: white; padding: 30px; border-radius: 12px; max-width: 500px; margin: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        input { width: 90%; padding: 10px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #ddd; }
+        .btn-save { background-color: #3498db; color: white; border: none; padding: 10px 20px; cursor: pointer; width: 100%; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Edit Data Buku</h2>
+        <form method="POST">
+            <label>Judul Buku</label>
+            <input type="text" name="judul" value="{{ buku.judul }}" required>
+            <label>Penulis</label>
+            <input type="text" name="penulis" value="{{ buku.penulis }}">
+            <label>Kategori</label>
+            <input type="text" name="kategori" value="{{ buku.kategori }}">
+            <label>Rak</label>
+            <input type="text" name="kode_rak" value="{{ buku.kode_rak }}">
+            <label>Baris</label>
+            <input type="number" name="baris_rak" value="{{ buku.baris_rak }}">
+            <label>Stok</label>
+            <input type="number" name="stok" value="{{ buku.stok }}">
+            <button type="submit" class="btn-save">Simpan Perubahan</button>
+        </form>
+        <br>
+        <a href="/" style="text-decoration: none; color: #7f8c8d;">Batal</a>
+    </div>
+</body>
+</html>

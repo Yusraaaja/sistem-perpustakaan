@@ -52,6 +52,7 @@
                     <th>Kategori</th>
                     <th>Lokasi Rak</th>
                     <th>Stok</th>
+                    <th>Aksi</th>
                 </tr>
                 {% for buku in results %}
                 <tr>
@@ -60,6 +61,11 @@
                     <td>{{ buku.kategori }}</td>
                     <td><span class="tag-rak">Rak {{ buku.kode_rak }} - Baris {{ buku.baris_rak }}</span></td>
                     <td>{{ buku.stok }}</td>
+                    <td>
+                        <a href="/edit/{{ buku.id }}" style="color: #3498db; text-decoration: none; margin-right: 10px;">Edit</a>
+
+                        <a href="/delete/{{ buku.id }}" style="color: #e74c3c; text-decoration: none;" onclick="return confirm('Yakin ingin menghapus buku ini?')">Hapus</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </table>
