@@ -10,7 +10,7 @@ def get_db_connection():
 
 @app.route('/')
 def index():
-    return "<h1>Selamat Datang di Sistem Perpustakaan Digital</h1><p>Gunakan /search untuk mencari buku.</p>"
+    return render_template('index.html')
 
 @app.route('/search')
 def search():
@@ -22,7 +22,56 @@ def search():
         results = conn.execute('SELECT * FROM buku WHERE judul LIKE ?', ('%' + query + '%',)).fetchall()
         conn.close()
 
-    return f"Hasil pencarian untuk '{query}': {[dict(row) for row in results]}"
+    return render_template('index.html', query=query, results=results)
+
+from datetime import datetime, timedelta
+
+@app.route('/pinjam', methods=['POST'])
+def pinjam():
+    id_buku = request.form.get('id_buku')
+    nama_peminjam = request.form.get('nama_peminjam')
+    nis = request.form.get('nis')
+
+    if id_buku and nama_peminjam:
+        conn = get_db_connection()
+        # Set tanggal pinjam hari ini dan kembali 7 hari lagi
+        tgl_pinjam = datetime.now().strftime('%Y-%m-%d')
+        tgl_kembali = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
+
+        #Simpan ke tabel peminjaman
+        conn.execute('INSERT INTO peminjaman (id_buku, id_anggota, tgl_pinjam, tgl_kembali) VALUES (?, ?, ?, ?)',
+                     (id_buku, nama_peminjam, tgl_pinjam, tgl_kembali))
+        
+        # Kurangi stok buku
+        conn.execute('UPDATE buku SET stok = stok - 1 WHERE id = ?', (id_buku,))
+
+        conn.commit()
+        conn.close()
+        return "Berhasil meminjam! Buku harus kembali dalam 7 hari."
+    return "Gagal meminjam, data tidak lengkap."
+
+from flask import redirect, url_for
+
+@app.route('/add', methods=['POST'])
+def add_book():
+    # Mengambil data dari form
+    judul = request.form.get('judul')
+    penulis = request.form.get('penulis')
+    kategori = request.form.get('kategori')
+    kode_rak = request.form.get('kode_rak')
+    baris_rak = request.form.get('baris_rak')
+    stok = request.form.get('stok')
+
+    if judul:
+        conn = get_db_connection()
+        conn.execute('''
+            INSERT INTO buku (judul, penulis, kategori, kode_rak, baris_rak, stok)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (judul, penulis, kategori, kode_rak, baris_rak, stok))
+        conn.commit()
+        conn.close()
+
+    return redirect(url_for('index')) # Kembali ke halaman utama setelah disimpan
 
 if __name__ == '__main__':
     app.run(debug=True)
