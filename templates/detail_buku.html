@@ -1,60 +1,97 @@
 {% extends 'layout.html' %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card shadow-sm mb-4 text-center p-4">
-            <div class="bg-light mx-auto mb-3" style="width: 200px; height: 300px; border: 2px dashed #ddd; line-height: 300px;">
-                <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm shadow-sm">
-                    <i class="bi bi-arrow-left"></i> Kembali ke Halaman Sebelumnya
-                </a>
+<div class="row justify-content-center mt-4">
+    <div class="col-md-9">
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <div class="mb-4 d-flex justify-content-between align-items-center">
+            <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm shadow-sm">
+                <i class="bi bi-arrow-left-circle"></i> Kembali ke Halaman Sebelumnya
+            </a>
+            <div class="d-flex gap-2">
+                <a href="/edit/{{ buku.id }}" class="btn btn-primary btn-sm"><i class="bi bi-pencil-square"></i> Edit Data</a>
+                <a href="/delete/{{ buku.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Hapus buku ini?')"><i class="bi bi-trash3"></i> Hapus</a>
             </div>
-            
-            <div class="card shadow-sm mb-4 text-center p-4 border-0">
-                <h2 class="fw-bold">{{ buku.judul }}</h2>
-                <p class="text-muted">Karya: {{ buku.penulis }} | Kategori: {{ buku.kategori }}</p>
-                <hr>
-                <div class="row text-start">
-                    <div class="col-6"><strong>Rak:</strong> {{ buku.kode_rak }}</div>
-                    <div class="col-6"><strong>Baris:</strong> {{ buku.baris_rak }}</div>
-                    <div class="col-12 mt-2"><strong>Tersedia:</strong> <span class="badge bg-success">{{ buku.stok }} Buku</span></div>
+        </div>
+
+        <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-5">
+            <div class="row g-0">
+                <div class="col-md-4 p-4 text-center bg-light border-end">
+                    
+                    {% if buku.cover_img %}
+                        <img src="{{ url_for('static', filename='covers/' + buku.cover_img) }}" 
+                             alt="Cover {{ buku.judul }}" 
+                             class="img-fluid rounded-3 shadow" 
+                             style="max-height: 400px; object-fit: cover;">
+                        
+                        <div class="mt-3">
+                            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formGantiCover">
+                                Ganti Cover
+                            </button>
+                            <div class="collapse mt-2" id="formGantiCover">
+                                <form action="/buku/{{ buku.id }}/upload_cover" method="POST" enctype="multipart/form-data">
+                                    <input type="file" name="cover_file" class="form-control form-control-sm mb-2" accept="image/*" required>
+                                    <button type="submit" class="btn btn-primary btn-sm w-100">Unggah Gambar Baru</button>
+                                </form>
+                            </div>
+                        </div>
+
+                    {% else %}
+                        <div class="border-4 border-dashed rounded-3 p-5 text-muted d-flex flex-column align-items-center justify-content-center h-100" style="min-height: 350px; background-color: #f8f9fa;">
+                            <i class="bi bi-image-fill mb-3" style="font-size: 3rem;"></i>
+                            <h6 class="fw-bold text-dark">Cover Kosong</h6>
+                            <p class="small text-center mb-4">Gunakan tombol di bawah untuk menambahkan gambar cover.</p>
+                            
+                            <form action="/buku/{{ buku.id }}/upload_cover" method="POST" enctype="multipart/form-data" class="w-100 px-3">
+                                <div class="input-group input-group-sm mb-2">
+                                    <input type="file" name="cover_file" class="form-control" accept="image/*" required>
+                                    <label class="input-group-text" for="cover_file">Pilih Gambar</label>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">Unggah Cover</button>
+                            </form>
+                            <small class="text-muted mt-2">(PNG, JPG, JPEG, GIF)</small>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-8 p-5">
+                    <span class="badge bg-info text-dark mb-2 rounded-pill px-3 py-2 text-uppercase fw-bold">{{ buku.kategori if buku.kategori else 'Tanpa Kategori' }}</span>
+                    <h1 class="display-5 fw-bold text-dark mb-1">{{ buku.judul }}</h1>
+                    <p class="text-muted fs-5 mb-4">Karya: <span class="fw-bold text-dark">{{ buku.penulis if buku.penulis else 'Penulis Anonim' }}</span></p>
+                    
+                    <div class="row g-3 bg-white p-4 rounded-3 border mb-4 shadow-xs">
+                        <div class="col-6 col-md-4">
+                            <div class="small text-muted">LOKASI RAK</div>
+                            <div class="fw-bold fs-5 text-primary">Rak {{ buku.kode_rak if buku.kode_rak else '-' }} / Baris {{ buku.baris_rak if buku.baris_rak else '-' }}</div>
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <div class="small text-muted">STOK TERSEDIA</div>
+                            <div class="fw-bold fs-5 text-success">{{ buku.stok if buku.stok else '0' }} Buku</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted">TGL MASUK INVENTARIS</div>
+                            <div class="fw-bold fs-6 text-dark">{{ buku.tanggal_masuk if buku.tanggal_masuk else '-' }}</div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid mt-2">
+                        <a href="#areaPinjam" class="btn btn-warning btn-lg fw-bold text-dark"><i class="bi bi-book"></i> Pinjam Buku Ini Sekarang</a>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="card p-4 mb-5 border-primary">
-            <h5 class="fw-bold text-primary">Form Peminjaman</h5>
-            <form action="/pinjam/{{ buku.id }}" method="POST">
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label>Status</label>
-                        <select name="tipe_user" class="form-select" required>
-                            <option value="Murid">Murid</option>
-                            <option value="Guru">Guru</option>
-                        </select>
-                    </div>
-                    <div class="col-md-8 mb-3">
-                        <label>Nama Lengkap</label>
-                        <input type="text" name="nama_peminjam" class="form-control" placeholder="Nama Anda" required>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="fw-bold small">Kelas (Pilih '-' jika Guru)</label>
-                        <select name="kelas" class="form-select" required>
-                            <option value="-">- (Khusus Guru/Staff)</option>
-                            <option value="X">Kelas 10 (X)</option>
-                            <option value="XI">Kelas 11 (XI)</option>
-                            <option value="XII">Kelas 12 (XII)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="fw-bold small">Jurusan/Status</label>
-                        <input type="text" name="jurusan" class="form-control" placeholder="Staff/Umum (Jika guru umum tulis bidang mengajarnya)" required>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary w-100">Konfirmasi Pinjam</button>
-            </form>
         </div>
-    </div>
 </div>
 {% endblock %}
