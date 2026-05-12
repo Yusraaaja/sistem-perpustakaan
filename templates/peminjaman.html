@@ -1,8 +1,17 @@
 {% extends 'layout.html' %}
 {% block content %}
-<h4 class="fw-bold mb-4">Daftar Peminjaman Aktif</h4>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Riwayat & Peminjaman Aktif</h4>
+    
+    {% if session.get('logged_in') %}
+    <a href="/export_peminjaman" class="btn btn-success shadow-sm">
+        <i class="bi bi-file-earmark-excel"></i> Export Laporan Excel
+    </a>
+    {% endif %}
+</div>
+
 <div class="table-responsive">
-    <table class="table table-striped align-middle bg-white shadow-sm">
+    <table class="table table-striped align-middle bg-white shadow-sm border">
         <thead class="table-dark">
             <tr>
                 <th>Tanggal</th>
@@ -18,7 +27,7 @@
                 <td>
                     {{ p.tgl_pinjam }}
                     {% if p.terlambat %}
-                        <br><span class="badge bg-danger" style="font-size: 0.6rem;">Terlambat {{ p.durasi }} Hari</span>
+                        <br><span class="badge bg-danger" style="font-size: 0.7rem;">Terlambat {{ p.durasi }} Hari</span>
                     {% endif %}
                 </td>
                 <td>
@@ -33,9 +42,9 @@
                 </td>
                 <td class="text-center">
                     {% if p.status == 'Dipinjam' %}
-                    <a href="/return/{{ p.id }}" class="btn btn-sm btn-outline-success">Kembalikan</a>
+                        <a href="/return/{{ p.id }}" class="btn btn-sm btn-success px-3">Kembalikan</a>
                     {% else %}
-                    <button class="btn btn-sm btn-secondary disabled opacity-50">Selesai</button>
+                        <span class="text-muted small italic">Telah Dikembalikan</span>
                     {% endif %}
                 </td>
             </tr>
