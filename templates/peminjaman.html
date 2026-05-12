@@ -14,8 +14,13 @@
         </thead>
         <tbody>
             {% for p in peminjaman %}
-            <tr>
-                <td>{{ p.tgl_pinjam }}</td>
+            <tr class="{{ 'table-danger' if p.terlambat else '' }}">
+                <td>
+                    {{ p.tgl_pinjam }}
+                    {% if p.terlambat %}
+                        <br><span class="badge bg-danger" style="font-size: 0.6rem;">Terlambat {{ p.durasi }} Hari</span>
+                    {% endif %}
+                </td>
                 <td>
                     <strong>{{ p.nama }}</strong><br>
                     <small class="text-muted">{{ p.tipe_user }} | {{ p.kelas }} - {{ p.jurusan }}</small>
@@ -37,5 +42,14 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Daftar Peminjaman Aktif</h4>
+    
+    {% if session.get('logged_in') %}
+    <a href="/export_peminjaman" class="btn btn-success shadow-sm">
+        <i class="bi bi-file-earmark-excel"></i> Export ke Excel
+    </a>
+    {% endif %}
 </div>
 {% endblock %}

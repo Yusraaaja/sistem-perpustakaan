@@ -25,6 +25,66 @@
             <a href="/koleksi" class="text-decoration-none float-end text-dark fw-bold">Tampilkan Semua</a>
         </div>
         {% endif %}
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-primary text-white border-0 shadow-sm p-3">
+                    <small class="opacity-75">Total Judul Buku</small>
+                    <h2 class="fw-bold mb-0">{{ total_judul }}</h2>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-warning text-dark border-0 shadow-sm p-3">
+                    <small class="opacity-75">Buku Sedang Dipinjam</small>
+                    <h2 class="fw-bold mb-0">{{ total_dipinjam }}</h2>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white border-0 shadow-sm p-3">
+                    <small class="opacity-75">Kategori Terpopuler</small>
+                    <h2 class="fw-bold mb-0">{{ top_kategori }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm border-0 p-4">
+                    <h5 class="fw-bold mb-3">Distribusi Kategori Buku</h5>
+                    <div style="height: 300px;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            // Gunakan tanda kutip agar editor menganggapnya sebagai string saat dibaca mentah
+            const rawLabels = '{{ labels|safe }}';
+            const rawValues = '{{ values|safe }}';
+
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    // JSON.parse memastikan data dibaca sebagai Array yang valid
+                    labels: JSON.parse(rawLabels),
+                    datasets: [{
+                        label: 'Jumlah Buku',
+                        data: JSON.parse(rawValues),
+                        backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+        </script>
         <table class="table table-hover align-middle mb-0">
             <thead class="table-dark">
                 <tr>

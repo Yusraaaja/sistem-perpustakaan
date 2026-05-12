@@ -3,12 +3,13 @@ import sqlite3
 from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
+import pandas as pd
+import json
 
 app = Flask(__name__)
-
 app.secret_key = 'kuncirahasia'
 
-# Data login admin (Sederhana dulu, nanti bisa dipindah ke database)
+# Data login admin
 ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = '123' 
 
@@ -68,7 +69,8 @@ def cari_buku():
 
 @app.route('/add', methods=['POST'])
 def tambah_buku():
-    if not session.get('logged_in'):
+    if not session.get('logged_in'): # Tambahkan ini
+        flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
     
     judul = request.form.get('judul')
@@ -92,7 +94,8 @@ def tambah_buku():
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit_buku(id):
-    if not session.get('logged_in'):
+    if not session.get('logged_in'): # Tambahkan ini
+        flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
     
     conn = get_db_connection()
@@ -114,7 +117,8 @@ def edit_buku(id):
 # UPDATE FUNGSI HAPUS: Supaya tetap di halaman terakhir
 @app.route('/delete/<int:id>')
 def hapus_buku(id):
-    if not session.get('logged_in'):
+    if not session.get('logged_in'): # Tambahkan ini
+        flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
     
     conn = get_db_connection()
@@ -175,7 +179,7 @@ def upload_cover(id):
     return redirect(url_for('detail_buku', id=id))
 
 @app.route('/pinjam/<int:id>', methods=['POST'])
-def pinjam_buku_aksi(id):
+def pinjam_buku(id):
     tipe = request.form.get('tipe_user')
     nama = request.form.get('nama_peminjam')
     kelas = request.form.get('kelas', '-')
@@ -191,21 +195,40 @@ def pinjam_buku_aksi(id):
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (id, nama, tipe, kelas, jurusan, tgl_pinjam, 'Dipinjam'))
         conn.execute('UPDATE buku SET stok = stok - 1 WHERE id = ?', (id,))
-        conn.commit()
+    conn.commit()
     conn.close()
     return redirect(url_for('daftar_peminjaman'))
 
 @app.route('/peminjaman')
 def daftar_peminjaman():
+    if not session.get('logged_in'): # Tambahkan ini
+        flash('Silakan login terlebih dahulu!', 'danger')
+        return redirect(url_for('login'))
+    
     conn = get_db_connection()
-    peminjaman = conn.execute('''
+    peminjaman_data = conn.execute('''
         SELECT p.id, b.judul, p.id_anggota as nama, p.tipe_user, p.kelas, p.jurusan, p.tgl_pinjam, p.status
         FROM peminjaman p
         JOIN buku b ON p.id_buku = b.id
         ORDER BY p.tgl_pinjam DESC
     ''').fetchall()
     conn.close()
-    return render_template('peminjaman.html', peminjaman=peminjaman)
+
+    # Logika Python untuk deteksi keterlambatan (> 7 hari)
+    peminjaman_final = []
+    tgl_sekarang = datetime.now().date()
+
+    for row in peminjaman_data:
+        p = dict(row)
+        tgl_pinjam = datetime.strptime(p['tgl_pinjam'], '%Y-%m-%d').date()
+        selisih = (tgl_sekarang - tgl_pinjam).days
+        
+        # Tambahkan flag terlambat jika status masih 'Dipinjam' dan lewat 7 hari
+        p['terlambat'] = True if selisih > 7 and p['status'] == 'Dipinjam' else False
+        p['durasi'] = selisih
+        peminjaman_final.append(p)
+
+    return render_template('peminjaman.html', peminjaman=peminjaman_final)
 
 @app.route('/return/<int:peminjaman_id>')
 def kembali_buku(peminjaman_id):
@@ -220,10 +243,39 @@ def kembali_buku(peminjaman_id):
 
 @app.route('/koleksi')
 def koleksi_lengkap():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+        
     conn = get_db_connection()
     all_books = conn.execute('SELECT * FROM buku ORDER BY id DESC').fetchall()
+    
+    # Statistik Dasar
+    total_judul = conn.execute('SELECT COUNT(*) FROM buku').fetchone()[0]
+    total_dipinjam = conn.execute('SELECT COUNT(*) FROM peminjaman WHERE status = "Dipinjam"').fetchone()[0]
+
+    top_kategori = conn.execute('''
+        SELECT kategori, COUNT(*) as jumlah 
+        FROM buku 
+        GROUP BY kategori 
+        ORDER BY jumlah DESC LIMIT 1
+    ''').fetchone()
+    
+    # Data untuk Grafik: Menghitung jumlah buku per kategori
+    query_chart = conn.execute('SELECT kategori, COUNT(*) as jumlah FROM buku GROUP BY kategori').fetchall()
+    
+    # Ubah ke format list agar bisa dibaca JavaScript
+    labels = [row['kategori'] for row in query_chart]
+    values = [row['jumlah'] for row in query_chart]
+    
     conn.close()
-    return render_template('koleksi.html', books=all_books)
+    
+    return render_template('koleksi.html', 
+                           books=all_books, 
+                           total_judul=total_judul,
+                           total_dipinjam=total_dipinjam,
+                           top_kategori=top_kategori['kategori'] if top_kategori else '-',
+                           labels=json.dumps(labels), # Kirim sebagai JSON
+                           values=json.dumps(values)) # Kirim sebagai JSON
 
 @app.route('/search_database')
 def search_database():
@@ -238,6 +290,35 @@ def search_database():
     
     # Kita kirim hasil pencarian ke koleksi.html menggunakan variabel 'books'
     return render_template('koleksi.html', books=results, query=query)
+
+import pandas as pd # Tambahkan import ini di bagian atas app.py
+
+@app.route('/export_peminjaman')
+def export_peminjaman():
+    # Pastikan hanya admin yang bisa download laporan
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    # Ambil data peminjaman lengkap dengan judul buku
+    query = '''
+        SELECT p.tgl_pinjam, p.id_anggota as Nama_Peminjam, p.tipe_user, 
+               p.kelas, p.jurusan, b.judul as Judul_Buku, p.status
+        FROM peminjaman p
+        JOIN buku b ON p.id_buku = b.id
+    '''
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+
+    # Tentukan nama file
+    file_path = 'static/laporan_peminjaman.xlsx'
+    
+    # Simpan ke Excel menggunakan pandas
+    df.to_excel(file_path, index=False)
+
+    # Kirim file ke browser untuk di-download
+    from flask import send_file
+    return send_file(file_path, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
