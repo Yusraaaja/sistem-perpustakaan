@@ -121,6 +121,9 @@ def edit_buku(id):
 # UPDATE FUNGSI HAPUS: Supaya tetap di halaman terakhir
 @app.route('/delete/<int:id>')
 def hapus_buku(id):
+    if 'username' not in session:
+        return redirect('/login')
+
     if not session.get('logged_in'): # Tambahkan ini
         flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
@@ -247,8 +250,8 @@ def kembali_buku(peminjaman_id):
 
 @app.route('/koleksi')
 def koleksi_lengkap():
-    if not session.get('logged_in'):
-        return redirect(url_for('login'))
+    # if not session.get('logged_in'):
+       # return redirect(url_for('login'))
         
     conn = get_db_connection()
     all_books = conn.execute('SELECT * FROM buku ORDER BY id DESC').fetchall()

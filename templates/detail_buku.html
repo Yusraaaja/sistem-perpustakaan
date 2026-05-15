@@ -19,10 +19,12 @@
             <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm shadow-sm">
                 <i class="bi bi-arrow-left-circle"></i> Kembali ke Halaman Sebelumnya
             </a>
-            <div class="d-flex gap-2">
-                <a href="/edit/{{ buku.id }}" class="btn btn-primary btn-sm"><i class="bi bi-pencil-square"></i> Edit Data</a>
-                <a href="/delete/{{ buku.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Hapus buku ini?')"><i class="bi bi-trash3"></i> Hapus</a>
-            </div>
+            {% if session.get('logged_in') %}
+                <div class="d-flex gap-2">
+                    <a href="/edit/{{ buku.id }}" class="btn btn-primary btn-sm"><i class="bi bi-pencil-square"></i> Edit Data</a>
+                    <a href="/delete/{{ buku.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Hapus buku ini?')"><i class="bi bi-trash3"></i> Hapus</a>
+                </div>
+            {% endif %}
         </div>
 
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-5">
