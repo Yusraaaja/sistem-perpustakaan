@@ -145,7 +145,9 @@
                         <th>Judul & Penulis</th>
                         <th>Kategori</th>
                         <th>Stok</th>
-                        <th class="text-center pe-4">Aksi</th>
+                        {% if session.get('logged_in') %}
+                            <th class="text-center pe-4">Aksi</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -162,16 +164,18 @@
                                 {{ b.stok }}
                             </span>
                         </td>
+                        {% if session.get('logged_in') %}
                         <td class="text-center pe-4">
                             <div class="btn-group shadow-xs">
                                 <a href="/edit/{{ b.id }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-pencil"></i> Edit
                                 </a>
-                                <a href="/delete/{{ b.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin ingin menghapus buku ini?')">
+                                <a href="/delete/{{ b.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin ingin menghapus?')">
                                     <i class="bi bi-trash"></i> Hapus
                                 </a>
                             </div>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>

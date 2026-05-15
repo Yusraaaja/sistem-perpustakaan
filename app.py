@@ -121,10 +121,8 @@ def edit_buku(id):
 # UPDATE FUNGSI HAPUS: Supaya tetap di halaman terakhir
 @app.route('/delete/<int:id>')
 def hapus_buku(id):
-    if 'username' not in session:
-        return redirect('/login')
 
-    if not session.get('logged_in'): # Tambahkan ini
+    if not session.get('logged_in'):
         flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
     
