@@ -153,6 +153,10 @@ def detail_buku(id):
 # Rute Upload Gambar
 @app.route('/buku/<int:id>/upload_cover', methods=['POST'])
 def upload_cover(id):
+    if not session.get('logged_in'):
+        flash('Akses ditolak! Anda harus login sebagai admin.', 'danger')
+        return redirect(url_for('detail_buku', id=id))
+
     if 'cover_file' not in request.files:
         flash('Tidak ada file yang dipilih', 'danger')
         return redirect(url_for('detail_buku', id=id))
