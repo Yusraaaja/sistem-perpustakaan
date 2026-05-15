@@ -1,4 +1,47 @@
 {% extends 'layout.html' %}
+{# --- TAMBAHKAN CSS KUSTOM DI SINI --- #}
+<style>
+    /* Container untuk efek hover */
+    .cover-hover-container {
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    /* Efek Zoom in saat hover pada container */
+    .cover-hover-container:hover {
+        transform: scale(1.03); /* Sedikit membesar */
+    }
+
+    /* Transisi untuk gambar utama */
+    .cover-image-detail {
+        transition: filter 0.3s ease;
+    }
+
+    /* Membuat gambar agak gelap saat hover agar ikon zoom terlihat */
+    .cover-hover-container:hover .cover-image-detail {
+        filter: brightness(70%);
+    }
+
+    /* Overlay untuk ikon zoom */
+    .hover-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0); /* Awalnya transparan */
+        opacity: 0; /* Awalnya tidak terlihat */
+        transition: opacity 0.3s ease, background-color 0.3s ease;
+        z-index: 2;
+    }
+
+    /* Menampilkan ikon zoom saat hover */
+    .cover-hover-container:hover .hover-overlay {
+        opacity: 1;
+    }
+</style>
 
 {% block content %}
 <div class="row justify-content-center mt-4">
@@ -30,17 +73,41 @@
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-5">
             <div class="row g-0">
                 <div class="col-md-4 p-4 text-center bg-light border-end d-flex flex-column align-items-center justify-content-center">
-                    {# --- LOGIKA TAMPILAN ADMIN --- #}
-                    {% if session.get('logged_in') %}
-                        {% if buku.cover_img %}
+                    
+                    {# --- AREA GAMBAR COVER (UNTUK ADMIN & USER) --- #}
+                    {% if buku.cover_img %}
+                        {# --- TAMBAHKAN LINK FANCYBOX DAN KELAS HOVER DI SINI --- #}
+                        <a href="{{ url_for('static', filename='covers/' + buku.cover_img) }}" 
+                        data-fancybox="gallery" 
+                        data-caption="{{ buku.judul }} - {{ buku.penulis }}"
+                        class="d-block w-100 cover-hover-container">
+                            
                             <img src="{{ url_for('static', filename='covers/' + buku.cover_img) }}" 
                                 alt="Cover {{ buku.judul }}" 
-                                class="img-fluid rounded-3 shadow" 
+                                class="img-fluid rounded-3 shadow cover-image-detail" 
                                 style="max-height: 400px; width: 100%; object-fit: cover;">
                             
+                            {# --- IKON ZOOM SAAT HOVER --- #}
+                            <div class="hover-overlay d-flex align-items-center justify-content-center rounded-3">
+                                <i class="bi bi-search text-white" style="font-size: 2.5rem;"></i>
+                            </div>
+                        </a>
+                    {% else %}
+                        {# --- PLACEHOLDER JIKA BELUM ADA COVER (UNTUK USER BIASA) --- #}
+                        {% if not session.get('logged_in') %}
+                            <div class="d-flex flex-column align-items-center justify-content-center w-100" style="height: 400px;">
+                                <i class="bi bi-book" style="font-size: 4rem; opacity: 0.3;"></i>
+                                <p class="small mt-2 text-muted">Belum ada cover</p>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+
+                    {# --- TOMBOL GANTI COVER (KHUSUS ADMIN) --- #}
+                    {% if session.get('logged_in') %}
+                        {% if buku.cover_img %}
                             <div class="mt-3 w-100">
                                 <button class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formGantiCover">
-                                    Ganti Cover
+                                    <i class="bi bi-pencil-square"></i> Ganti Cover
                                 </button>
                                 <div class="collapse mt-2" id="formGantiCover">
                                     <form action="/buku/{{ buku.id }}/upload_cover" method="POST" enctype="multipart/form-data">
@@ -50,6 +117,7 @@
                                 </div>
                             </div>
                         {% else %}
+                            {# --- AREA UNGGAH COVER PERTAMA (KHUSUS ADMIN) --- #}
                             <div class="w-100 border-4 border-dashed rounded-3 p-4 text-muted d-flex flex-column align-items-center justify-content-center" style="min-height: 400px; background-color: #f8f9fa;">
                                 <i class="bi bi-image-fill mb-3" style="font-size: 3rem;"></i>
                                 <h6 class="fw-bold text-dark">Cover Kosong</h6>
@@ -60,20 +128,6 @@
                                     <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">Unggah Cover</button>
                                 </form>
                                 <small class="text-muted mt-2">(PNG, JPG, JPEG, GIF)</small>
-                            </div>
-                        {% endif %}
-
-                    {# --- LOGIKA TAMPILAN USER BIASA --- #}
-                    {% else %}
-                        {% if buku.cover_img %}
-                            <img src="{{ url_for('static', filename='covers/' + buku.cover_img) }}" 
-                                class="img-fluid rounded-3 shadow" 
-                                alt="Cover {{ buku.judul }}" 
-                                style="max-height: 400px; width: 100%; object-fit: cover;">
-                        {% else %}
-                            <div class="d-flex flex-column align-items-center justify-content-center w-100" style="height: 400px;">
-                                <i class="bi bi-book" style="font-size: 4rem; opacity: 0.3;"></i>
-                                <p class="small mt-2 text-muted">Belum ada cover</p>
                             </div>
                         {% endif %}
                     {% endif %}
