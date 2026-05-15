@@ -1,52 +1,67 @@
 {% extends 'layout.html' %}
+
 {% block content %}
-<div class="card shadow-sm p-4">
-    <h4 class="fw-bold mb-3">Pencarian Cepat</h4>
+<div class="card shadow-sm p-4 border-0">
+    <h4 class="fw-bold mb-3 text-dark">Pencarian Koleksi Buku</h4>
+    
     <form action="/search" method="GET" class="d-flex mb-4">
-        <input type="text" name="query" class="form-control me-2" placeholder="Ketik judul buku..." value="{{ query or '' }}">
-        <button type="submit" class="btn btn-primary px-4">Cari</button>
+        <input type="text" name="query" class="form-control me-2 shadow-sm" 
+               placeholder="Ketik judul buku atau penulis..." 
+               value="{{ query or '' }}" required>
+        <button type="submit" class="btn btn-primary px-4 shadow-sm">
+            <i class="bi bi-search"></i> Cari
+        </button>
     </form>
 
+    <hr class="text-muted opacity-25 mb-4">
+
+    {# LOGIKA UTAMA: Cek apakah ada hasil pencarian #}
     {% if results %}
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>Judul Buku (Klik untuk Detail)</th>
-                    <th>Penulis</th>
-                    <th>Stok</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for b in results %}
-                <tr>
-                    <td>
-                        <a href="/buku/{{ b.id }}" class="text-decoration-none fw-bold text-primary">
-                            {{ b.judul }}
-                        </a>
-                    </td>
-                    <td>{{ b.penulis }}</td>
-                    <td><span class="badge bg-success">{{ b.stok }}</span></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% if query %}
-            {% if results %}
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        </table>
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <i class="bi bi-search-heart text-muted" style="font-size: 3rem;"></i>
-                    <h5 class="mt-3 text-secondary">Maaf, buku "<strong>{{ query }}</strong>" tidak ditemukan.</h5>
-                    <p class="small text-muted">Coba gunakan kata kunci lain atau periksa ejaan Anda.</p>
-                    <a href="/" class="btn btn-outline-primary btn-sm">Tampilkan Semua Buku</a>
-                </div>
-            {% endif %}
-        {% endif %}
-    </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Judul Buku</th>
+                        <th>Penulis</th>
+                        <th>Stok</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in results %}
+                    <tr>
+                        <td>
+                            <a href="/buku/{{ b.id }}" class="text-decoration-none fw-bold text-primary">
+                                {{ b.judul }}
+                            </a>
+                        </td>
+                        <td>{{ b.penulis }}</td>
+                        <td>
+                            <span class="badge {{ 'bg-success' if b.stok > 0 else 'bg-danger' }}">
+                                {{ b.stok }} Tersedia
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    {# LOGIKA KEDUA: Jika tidak ada hasil, tapi user sedang mencari sesuatu (query ada) #}
+    {% elif query %}
+        <div class="text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-search-heart text-muted" style="font-size: 4rem; opacity: 0.5;"></i>
+            </div>
+            <h5 class="text-secondary">Buku "<strong>{{ query }}</strong>" tidak ditemukan</h5>
+            <p class="text-muted small">Coba gunakan kata kunci lain atau periksa kembali ejaan Anda.</p>
+            <a href="/" class="btn btn-outline-secondary btn-sm mt-2">Lihat Semua Koleksi</a>
+        </div>
+
+    {# LOGIKA KETIGA: Kondisi awal saat halaman baru dibuka (opsional) #}
+    {% else %}
+        <div class="text-center py-4 text-muted">
+            <p>Gunakan kolom di atas untuk mencari buku di perpustakaan.</p>
+        </div>
     {% endif %}
 </div>
 {% endblock %}
