@@ -20,10 +20,21 @@
 <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
     <div class="table-responsive">
         {% if query %}
-        <div class="alert alert-info py-2 mb-3 small">
-            Menampilkan hasil pencarian untuk: <strong>"{{ query }}"</strong> 
-            <a href="/koleksi" class="text-decoration-none float-end text-dark fw-bold">Tampilkan Semua</a>
-        </div>
+            <div class="alert alert-info py-2 mb-3 small d-flex justify-content-between align-items-center">
+                <span>Menampilkan hasil untuk: <strong>"{{ query }}"</strong></span>
+                <a href="/koleksi" class="btn btn-sm btn-dark">Reset</a>
+            </div>
+        {% endif %}
+
+        {% if books %}
+            <table class="table table-hover align-middle mb-0">
+                </table>
+        {% else %}
+            <div class="p-5 text-center bg-white border rounded">
+                <i class="bi bi-database-exclamation text-warning" style="font-size: 3rem;"></i>
+                <h5 class="fw-bold mt-3">Data Tidak Ditemukan</h5>
+                <p class="text-muted">Tidak ada buku dalam database yang cocok dengan kata kunci tersebut.</p>
+            </div>
         {% endif %}
         <div class="row mb-4">
             <div class="col-md-4">
