@@ -71,34 +71,71 @@ def cari_buku():
         conn.close()
     return render_template('index.html', query=query, results=results)
 
-@app.route('/add', methods=['POST'])
+@app.route('/add', methods=['GET', 'POST'])
 def tambah_buku():
-    if not session.get('logged_in'): # Tambahkan ini
+    if not session.get('logged_in'):
         flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
-    
-    judul = request.form.get('judul')
-    penulis = request.form.get('penulis')
-    kategori = request.form.get('kategori')
-    kode_rak = request.form.get('kode_rak')
-    baris_rak = request.form.get('baris_rak')
-    stok = request.form.get('stok')
-    # Ambil tanggal hari ini secara otomatis
-    tgl_masuk = datetime.now().strftime('%Y-%m-%d')
+        
+    if request.method == 'POST':
+        # 1. Mengambil Data Umum Buku
+        judul = request.form.get('judul')
+        sub_judul = request.form.get('sub_judul', '')
+        penulis = request.form.get('penulis')
+        penerbit = request.form.get('penerbit')
+        tahun_terbit = request.form.get('tahun_terbit')
+        isbn = request.form.get('isbn')
+        kategori = request.form.get('kategori')
+        sinopsis = request.form.get('sinopsis')
+        
+        # 2. Mengambil Data Inventaris Internal (Form Baru)
+        id_buku_fisik = request.form.get('id_buku_fisik')
+        nomor_panggil = request.form.get('nomor_panggil')
+        lokasi_rak = request.form.get('lokasi_rak')
+        sumber_perolehan = request.form.get('sumber_perolehan')
+        tanggal_masuk = request.form.get('tanggal_masuk')
+        kondisi_buku = request.form.get('kondisi_buku', 'Baik')
+        
+        # Penanganan data angka (Harga & Stok)
+        harga_input = request.form.get('harga_buku')
+        harga_buku = int(harga_input) if harga_input else 0
+        
+        stok_input = request.form.get('stok')
+        stok = int(stok_input) if stok_input else 1
 
-    if judul:
+        # 3. Proses Unggah Cover Buku
+        file = request.files.get('cover_img')
+        filename = None
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        
+        # 4. Simpan ke Database perpustakaan.db
         conn = get_db_connection()
-        conn.execute('''
-            INSERT INTO buku (judul, penulis, kategori, kode_rak, baris_rak, stok, tanggal_masuk)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (judul, penulis, kategori, kode_rak, baris_rak, stok, tgl_masuk))
-        conn.commit()
-        conn.close()
-    return redirect(url_for('koleksi_lengkap'))
+        try:
+            conn.execute('''
+                INSERT INTO buku (
+                    judul, sub_judul, penulis, penerbit, tahun_terbit, isbn, kategori, sinopsis, cover_img,
+                    id_buku_fisik, nomor_panggil, lokasi_rak, sumber_perolehan, tanggal_masuk, kondisi_buku, harga_buku, stok
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                judul, sub_judul, penulis, penerbit, tahun_terbit, isbn, kategori, sinopsis, filename,
+                id_buku_fisik, nomor_panggil, lokasi_rak, sumber_perolehan, tanggal_masuk, kondisi_buku, harga_buku, stok
+            ))
+            conn.commit()
+            flash('Buku baru beserta data inventaris berhasil ditambahkan!', 'success')
+        except sqlite3.IntegrityError:
+            flash('Gagal! Barcode / ID Buku Fisik sudah terdaftar di sistem.', 'danger')
+        finally:
+            conn.close()
+            
+        return redirect(url_for('koleksi_lengkap'))
+        
+    return render_template('tambah_buku.html')
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit_buku(id):
-    if not session.get('logged_in'): # Tambahkan ini
+    if not session.get('logged_in'):
         flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
     
@@ -107,13 +144,32 @@ def edit_buku(id):
 
     if request.method == 'POST':
         conn.execute('''
-            UPDATE buku SET judul=?, penulis=?, kategori=?, kode_rak=?, baris_rak=?, stok=?
+            UPDATE buku SET 
+                judul=?, sub_judul=?, penulis=?, penerbit=?, tahun_terbit=?, 
+                isbn=?, kategori=?, sinopsis=?, id_buku_fisik=?, 
+                nomor_panggil=?, lokasi_rak=?, harga_buku=?, stok=?
             WHERE id=?
-        ''', (request.form['judul'], request.form['penulis'], request.form['kategori'], 
-              request.form['kode_rak'], request.form['baris_rak'], request.form['stok'], id))
+        ''', (
+            request.form.get('judul'),
+            request.form.get('sub_judul'),
+            request.form.get('penulis'),
+            request.form.get('penerbit'),
+            request.form.get('tahun_terbit'),
+            request.form.get('isbn'),
+            request.form.get('kategori'),
+            request.form.get('sinopsis'),
+            request.form.get('id_buku_fisik'),
+            request.form.get('nomor_panggil'),
+            request.form.get('lokasi_rak'),
+            request.form.get('harga_buku', 0),
+            request.form.get('stok'),
+            id
+        ))
         conn.commit()
         conn.close()
-        return redirect(url_for('index'))
+        flash('Data buku berhasil diperbarui!', 'success')
+        # Agar setelah edit kembali ke halaman detail buku tersebut
+        return redirect(url_for('detail_buku', id=id))
     
     conn.close()
     return render_template('edit.html', buku=book)
@@ -187,54 +243,78 @@ def upload_cover(id):
         
     return redirect(url_for('detail_buku', id=id))
 
-@app.route('/pinjam/<int:id>', methods=['POST'])
-def pinjam_buku(id):
-    tipe = request.form.get('tipe_user')
+@app.route('/pinjam/<int:buku_id>', methods=['POST'])
+def pinjam_buku(buku_id):
     nama = request.form.get('nama_peminjam')
+    tipe_user = request.form.get('tipe_user')
     kelas = request.form.get('kelas', '-')
     jurusan = request.form.get('jurusan', '-')
-    tgl_pinjam = datetime.now().strftime('%Y-%m-%d')
-
+    
+    # Menangkap durasi dinamis (7 atau 14 hari) dari formulir baru
+    durasi_input = request.form.get('durasi_pinjam')
+    durasi = int(durasi_input) if durasi_input else 14
+    
+    tgl_sekarang = datetime.now()
+    tgl_pinjam_str = tgl_sekarang.strftime('%Y-%m-%d')
+    tgl_kembali_str = (tgl_sekarang + timedelta(days=durasi)).strftime('%Y-%m-%d')
+    
     conn = get_db_connection()
-    buku = conn.execute('SELECT stok FROM buku WHERE id = ?', (id,)).fetchone()
+    buku = conn.execute('SELECT stok FROM buku WHERE id = ?', (buku_id,)).fetchone()
     
     if buku and buku['stok'] > 0:
+        # Kurangi stok buku di rak
+        conn.execute('UPDATE buku SET stok = stok - 1 WHERE id = ?', (buku_id,))
+        # Simpan data transaksi ke database
         conn.execute('''
-            INSERT INTO peminjaman (id_buku, id_anggota, tipe_user, kelas, jurusan, tgl_pinjam, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (id, nama, tipe, kelas, jurusan, tgl_pinjam, 'Dipinjam'))
-        conn.execute('UPDATE buku SET stok = stok - 1 WHERE id = ?', (id,))
-    conn.commit()
+            INSERT INTO peminjaman (id_buku, id_anggota, tipe_user, kelas, jurusan, tgl_pinjam, tgl_kembali_seharusnya, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (buku_id, nama, tipe_user, kelas, jurusan, tgl_pinjam_str, tgl_kembali_str, 'Dipinjam'))
+        conn.commit()
+        flash('Buku berhasil dipinjam! Selamat membaca.', 'success')
+    else:
+        flash('Mohon maaf, stok buku ini sedang kosong.', 'danger')
+        
     conn.close()
     return redirect(url_for('daftar_peminjaman'))
 
 @app.route('/peminjaman')
 def daftar_peminjaman():
-    if not session.get('logged_in'): # Tambahkan ini
+    if not session.get('logged_in'):
         flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
     
     conn = get_db_connection()
+    # Menarik seluruh kolom transaksi yang dibutuhkan oleh UI baru
     peminjaman_data = conn.execute('''
-        SELECT p.id, b.judul, p.id_anggota as nama, p.tipe_user, p.kelas, p.jurusan, p.tgl_pinjam, p.status
+        SELECT p.id, b.judul, p.id_anggota as nama, p.tipe_user, p.kelas, p.jurusan, 
+               p.tgl_pinjam, p.tgl_kembali_seharusnya, p.tgl_dikembalikan, p.status, p.denda
         FROM peminjaman p
         JOIN buku b ON p.id_buku = b.id
-        ORDER BY p.tgl_pinjam DESC
+        ORDER BY p.status DESC, p.tgl_pinjam DESC
     ''').fetchall()
     conn.close()
 
-    # Logika Python untuk deteksi keterlambatan (> 7 hari)
     peminjaman_final = []
     tgl_sekarang = datetime.now().date()
 
     for row in peminjaman_data:
         p = dict(row)
-        tgl_pinjam = datetime.strptime(p['tgl_pinjam'], '%Y-%m-%d').date()
-        selisih = (tgl_sekarang - tgl_pinjam).days
         
-        # Tambahkan flag terlambat jika status masih 'Dipinjam' dan lewat 7 hari
-        p['terlambat'] = True if selisih > 7 and p['status'] == 'Dipinjam' else False
-        p['durasi'] = selisih
+        # Logika menghitung keterlambatan secara riil
+        if p['status'] == 'Dipinjam' and p['tgl_kembali_seharusnya']:
+            tgl_tenggat = datetime.strptime(p['tgl_kembali_seharusnya'], '%Y-%m-%d').date()
+            selisih = (tgl_sekarang - tgl_tenggat).days
+            
+            if selisih > 0:
+                p['terlambat'] = True
+                p['durasi_terlambat'] = selisih
+            else:
+                p['terlambat'] = False
+                p['durasi_terlambat'] = 0
+        else:
+            p['terlambat'] = False
+            p['durasi_terlambat'] = 0
+            
         peminjaman_final.append(p)
 
     return render_template('peminjaman.html', peminjaman=peminjaman_final)
@@ -281,6 +361,10 @@ def proses_pinjam(buku_id):
 
 @app.route('/kembalikan/<int:pinjam_id>', methods=['POST'])
 def proses_kembalikan(pinjam_id):
+    if not session.get('logged_in'):
+        flash('Akses ditolak!', 'danger')
+        return redirect(url_for('login'))
+
     status_kembali = request.form.get('status_kembali') # 'Normal', 'Rusak', 'Hilang'
     tgl_sekarang = datetime.now()
     tgl_sekarang_str = tgl_sekarang.strftime('%Y-%m-%d')
@@ -294,35 +378,39 @@ def proses_kembalikan(pinjam_id):
     ''', (pinjam_id,)).fetchone()
     
     if pinjaman:
-        # 1. Hitung denda keterlambatan (Rp 1.000 / hari)
-        tgl_seharusnya = datetime.strptime(pinjaman['tgl_kembali_seharusnya'], '%Y-%m-%d')
-        hari_terlambat = (tgl_sekarang - tgl_seharusnya).days
-        
+        # 1. Hitung denda keterlambatan (Rp 1.000 / hari jika melewati batas seharusnya)
         denda_keterlambatan = 0
-        if hari_terlambat > 0:
-            denda_keterlambatan = hari_terlambat * 1000
+        if pinjaman['tgl_kembali_seharusnya']:
+            tgl_seharusnya = datetime.strptime(pinjaman['tgl_kembali_seharusnya'], '%Y-%m-%d')
+            hari_terlambat = (tgl_sekarang - tgl_seharusnya).days
+            if hari_terlambat > 0:
+                denda_keterlambatan = hari_terlambat * 1000
             
         # 2. Logika Aturan Opsi A (Buku Rusak / Hilang)
         denda_kondisi = 0
+        # Jika kolom harga_buku kosong di db, berikan nilai default 0
+        harga_buku_asli = pinjaman['harga_buku'] if pinjaman['harga_buku'] else 0
+        
         if status_kembali in ['Rusak', 'Hilang']:
-            denda_kondisi = pinjaman['harga_buku'] # Bebankan harga buku asli
-            # Update kondisi buku fisik di inventaris
+            denda_kondisi = harga_buku_asli  # Membebankan harga buku riil ke denda siswa
             conn.execute('UPDATE buku SET kondisi_buku = ? WHERE id = ?', (status_kembali, pinjaman['buku_id']))
         else:
-            # Jika kembali normal, kembalikan stok ke rak
+            # Jika kembali normal, kembalikan 1 eksemplar stok ke rak buku
             conn.execute('UPDATE buku SET stok = stok + 1 WHERE id = ?', (pinjaman['buku_id']))
             
         total_denda = denda_keterlambatan + denda_kondisi
+        status_final = f"Selesai ({status_kembali})"
         
-        # 3. Update status peminjaman
+        # 3. Kunci data transaksi peminjaman
         conn.execute('''
             UPDATE peminjaman 
             SET tgl_dikembalikan = ?, status = ?, denda = ? 
             WHERE id = ?
-        ''', (tgl_sekarang_str, 'Selesai (' + status_kembali + ')', total_denda, pinjam_id))
+        ''', (tgl_sekarang_str, status_final, total_denda, pinjam_id))
         conn.commit()
         
-        flash(f'Proses berhasil! Status: {status_kembali}. Total Denda: Rp {total_denda:,}', 'info')
+        flash(f'Buku berhasil diproses! Status Fisik: {status_kembali}. Total Akumulasi Denda: Rp {total_denda:,}', 'success')
+    
     conn.close()
     return redirect(url_for('daftar_peminjaman'))
 
@@ -406,7 +494,7 @@ def export_peminjaman():
     return send_file(file_path, as_attachment=True)
 
 def init_db():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('perpustakaan.db')
     cursor = conn.cursor()
     
     # 1. TABEL BUKU (Katalog & Inventaris Lengkap)

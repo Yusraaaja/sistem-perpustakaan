@@ -1,64 +1,89 @@
 {% extends 'layout.html' %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold mb-0">Riwayat & Peminjaman Aktif</h4>
+<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+    <div>
+        <h4 class="fw-bold mb-0 text-dark">Log Transaksi & Peminjaman Aktif</h4>
+        <p class="text-muted small mb-0">Manajemen sirkulasi, pelacakan tenggat waktu, dan denda</p>
+    </div>
     
     {% if session.get('logged_in') %}
-    <a href="/export_peminjaman" class="btn btn-success shadow-sm">
+    <a href="/export_peminjaman" class="btn btn-success btn-sm shadow-sm">
         <i class="bi bi-file-earmark-excel"></i> Export Laporan Excel
     </a>
     {% endif %}
 </div>
 
-<div class="table-responsive">
-    <table class="table table-striped align-middle bg-white shadow-sm border">
-        <thead class="table-dark">
-            <tr>
-                <th>Tanggal</th>
-                <th>Peminjam</th>
-                <th>Buku</th>
-                <th>Status</th>
-                <th class="text-center">Aksi</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in peminjaman %}
-            <tr class="{{ 'table-danger' if p.terlambat else '' }}">
-                <td>
-                    {{ p.tgl_pinjam }}
-                    {% if p.terlambat %}
-                        <br><span class="badge bg-danger" style="font-size: 0.7rem;">Terlambat {{ p.durasi }} Hari</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <strong>{{ p.nama }}</strong><br>
-                    <small class="text-muted">{{ p.tipe_user }} | {{ p.kelas }} - {{ p.jurusan }}</small>
-                </td>
-                <td>{{ p.judul }}</td>
-                <td>
-                    <span class="badge {{ 'bg-warning text-dark' if p.status == 'Dipinjam' else 'bg-success' }}">
-                        {{ p.status }}
-                    </span>
-                </td>
-                <td class="text-center">
-                    {% if p.status == 'Dipinjam' %}
-                        <a href="/return/{{ p.id }}" class="btn btn-sm btn-success px-3">Kembalikan</a>
-                    {% else %}
-                        <span class="text-muted small italic">Telah Dikembalikan</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold mb-0">Daftar Peminjaman Aktif</h4>
-    
-    {% if session.get('logged_in') %}
-    <a href="/export_peminjaman" class="btn btn-success shadow-sm">
-        <i class="bi bi-file-earmark-excel"></i> Export ke Excel
-    </a>
-    {% endif %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th class="ps-4">Masa Pinjam & Batas Waktu</th>
+                    <th>Peminjam (Siswa/Guru)</th>
+                    <th>Informasi Buku</th>
+                    <th>Status / Denda</th>
+                    <th class="text-center pe-4">Aksi Pustakawan</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in peminjaman %}
+                <tr class="{{ 'table-danger' if p.terlambat and p.status == 'Dipinjam' else '' }}">
+                    <td class="ps-4">
+                        <small class="d-block text-dark fw-bold">Pinjam: {{ p.tgl_pinjam }}</small>
+                        <small class="d-block text-muted">Kembali: {{ p.tgl_kembali_seharusnya if p.tgl_kembali_seharusnya else '-' }}</small>
+                        {% if p.tgl_dikembalikan %}
+                            <small class="d-block text-success fw-bold">Selesai: {{ p.tgl_dikembalikan }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <strong class="text-dark">{{ p.nama }}</strong><br>
+                        <small class="text-muted">{{ p.tipe_user }} | Kelas {{ p.kelas }} - {{ p.jurusan }}</small>
+                    </td>
+                    <td><span class="fw-bold text-primary">{{ p.judul }}</span></td>
+                    <td>
+                        {% if p.status == 'Dipinjam' %}
+                            <span class="badge bg-warning text-dark px-2 py-1 rounded">Dipinjam</span>
+                            {% if p.terlambat %}
+                                <span class="badge bg-danger d-block mt-1" style="font-size: 0.65rem;">Terlambat {{ p.durasi_terlambat }} Hari</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-success px-2 py-1 rounded">{{ p.status }}</span>
+                            {% if p.denda > 0 %}
+                                <span class="badge bg-danger d-block mt-1" style="font-size: 0.65rem;">Denda: Rp {{ p.denda|int }}</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td class="text-center pe-4">
+                        {% if p.status == 'Dipinjam' %}
+                            <form action="/kembalikan/{{ p.id }}" method="POST" class="d-flex gap-1 justify-content-center align-items-center">
+                                <select name="status_kembali" class="form-select form-select-sm" style="width: 110px;" required>
+                                    <option value="Normal">Normal</option>
+                                    <option value="Rusak">Rusak</option>
+                                    <option value="Hilang">Hilang</option>
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-dark" onclick="return confirm('Proses pengembalian eksemplar?')">
+                                    Proses
+                                </button>
+                            </form>
+                        {% else %}
+                            <span class="text-muted small"><i class="bi bi-check2-circle text-success"></i> Selesai</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

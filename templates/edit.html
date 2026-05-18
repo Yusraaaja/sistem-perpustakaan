@@ -1,55 +1,81 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Buku</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
+{% extends 'layout.html' %}
 
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm p-4">
-                <h5 class="fw-bold mb-4 text-primary">Perbarui Data Buku</h5>
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-secondary">Judul Buku</label>
-                        <input type="text" name="judul" class="form-control" value="{{ buku.judul }}" required>
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 rounded-3 p-4 mb-5">
+            <h4 class="fw-bold text-dark mb-1"><i class="bi bi-pencil-square text-primary"></i> Perbarui Manajemen Data Buku</h4>
+            <p class="text-muted small mb-4">Pastikan data katalog dan fisik inventaris sinkron dengan kondisi riil di rak.</p>
+            
+            <form action="/edit/{{ buku.id }}" method="POST">
+                <h6 class="fw-bold text-primary text-uppercase small mb-3 border-bottom pb-2">I. Informasi Katalog Buku</h6>
+                
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label class="fw-bold small mb-1">Judul Utama Buku</label>
+                        <input type="text" name="judul" class="form-control form-control-sm" value="{{ buku.judul }}" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-secondary">Penulis</label>
-                        <input type="text" name="penulis" class="form-control" value="{{ buku.penulis }}">
+                    <div class="col-12 mb-3">
+                        <label class="fw-bold small mb-1">Sub Judul / Keterangan Tambahan</label>
+                        <input type="text" name="sub_judul" class="form-control form-control-sm" value="{{ buku.sub_judul if buku.sub_judul else '' }}" placeholder="Contoh: Edisi Revisi / Terjemahan Resmi">
                     </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-secondary">Kategori</label>
-                        <input type="text" name="kategori" class="form-control" value="{{ buku.kategori }}">
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small mb-1">Penulis / Pengarang</label>
+                        <input type="text" name="penulis" class="form-control form-control-sm" value="{{ buku.penulis }}" required>
                     </div>
-                    <div class="row mb-3">
-                        <div class="col-6">
-                            <label class="form-label small fw-bold text-secondary">Rak</label>
-                            <input type="text" name="kode_rak" class="form-control" value="{{ buku.kode_rak }}">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small fw-bold text-secondary">Baris</label>
-                            <input type="number" name="baris_rak" class="form-control" value="{{ buku.baris_rak }}">
-                        </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small mb-1">Kategori / Klasifikasi</label>
+                        <input type="text" name="kategori" class="form-control form-control-sm" value="{{ buku.kategori }}" required>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label small fw-bold text-secondary">Stok</label>
-                        <input type="number" name="stok" class="form-control" value="{{ buku.stok }}">
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small mb-1">Penerbit</label>
+                        <input type="text" name="penerbit" class="form-control form-control-sm" value="{{ buku.penerbit if buku.penerbit else '' }}">
                     </div>
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary fw-bold">Simpan Perubahan</button>
-                        <a href="/" class="btn btn-outline-secondary">Batal</a>
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small mb-1">Tahun Terbit</label>
+                        <input type="text" name="tahun_terbit" class="form-control form-control-sm" value="{{ buku.tahun_terbit if buku.tahun_terbit else '' }}">
                     </div>
-                </form>
-            </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small mb-1">Nomor ISBN</label>
+                        <input type="text" name="isbn" class="form-control form-control-sm" value="{{ buku.isbn if buku.isbn else '' }}">
+                    </div>
+                    <div class="col-12 mb-4">
+                        <label class="fw-bold small mb-1">Sinopsis Ringkas</label>
+                        <textarea name="sinopsis" class="form-control form-control-sm" rows="3" placeholder="Tulis sinopsis buku di sini...">{{ buku.sinopsis if buku.sinopsis else '' }}</textarea>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold text-success text-uppercase small mb-3 border-bottom pb-2">II. Data Inventaris Fisik & Aset</h6>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small mb-1">ID Unik Buku Fisik (Barcode)</label>
+                        <input type="text" name="id_buku_fisik" class="form-control form-control-sm bg-light" value="{{ buku.id_buku_fisik if buku.id_buku_fisik else '' }}" placeholder="Contoh: BKS-2026-001">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small mb-1">Nomor Panggil (Call Number)</label>
+                        <input type="text" name="nomor_panggil" class="form-control form-control-sm" value="{{ buku.nomor_panggil if buku.nomor_panggil else '' }}" placeholder="Contoh: 813 MAN f">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small mb-1">Lokasi Kode Rak</label>
+                        <input type="text" name="lokasi_rak" class="form-control form-control-sm" value="{{ buku.lokasi_rak if buku.lokasi_rak else '' }}" placeholder="Contoh: Rak A-1">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small mb-1">Harga Buku Asli (Rp)</label>
+                        <input type="number" name="harga_buku" class="form-control form-control-sm" value="{{ buku.harga_buku if buku.harga_buku else 0 }}" placeholder="Untuk denda Opsi A">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small mb-1">Jumlah Stok Fisik</label>
+                        <input type="number" name="stok" class="form-control form-control-sm" value="{{ buku.stok }}" required>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm">Simpan Perubahan</button>
+                    <a href="/buku/{{ buku.id }}" class="btn btn-outline-secondary btn-sm px-4">Batal</a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
-
-</body>
-</html>
+{% endblock %}
