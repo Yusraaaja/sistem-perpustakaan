@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from werkzeug.utils import secure_filename
 import pandas as pd
@@ -250,6 +250,82 @@ def kembali_buku(peminjaman_id):
     conn.close()
     return redirect(url_for('daftar_peminjaman'))
 
+@app.route('/pinjam/<int:buku_id>', methods=['POST'])
+def proses_pinjam(buku_id):
+    nama = request.form.get('nama_peminjam')
+    tipe_user = request.form.get('tipe_user')
+    kelas = request.form.get('kelas')
+    jurusan = request.form.get('jurusan')
+    durasi = int(request.form.get('durasi_pinjam')) # 7 atau 14 hari
+    
+    tgl_sekarang = datetime.now()
+    tgl_pinjam_str = tgl_sekarang.strftime('%Y-%m-%d')
+    tgl_kembali_str = (tgl_sekarang + timedelta(days=durasi)).strftime('%Y-%m-%d')
+    
+    conn = get_db_connection()
+    # Cek stok
+    buku = conn.execute('SELECT stok FROM buku WHERE id = ?', (buku_id,)).fetchone()
+    if buku and buku['stok'] > 0:
+        # Kurangi stok dan masukkan data peminjaman
+        conn.execute('UPDATE buku SET stok = stok - 1 WHERE id = ?', (buku_id,))
+        conn.execute('''
+            INSERT INTO peminjaman (id_buku, id_anggota, tipe_user, kelas, jurusan, tgl_pinjam, tgl_kembali_seharusnya)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (buku_id, nama, tipe_user, kelas, jurusan, tgl_pinjam_str, tgl_kembali_str))
+        conn.commit()
+        flash('Buku berhasil dipinjam! Selamat membaca.', 'success')
+    else:
+        flash('Stok buku kosong!', 'danger')
+    conn.close()
+    return redirect(url_for('detail_buku', id=buku_id))
+
+@app.route('/kembalikan/<int:pinjam_id>', methods=['POST'])
+def proses_kembalikan(pinjam_id):
+    status_kembali = request.form.get('status_kembali') # 'Normal', 'Rusak', 'Hilang'
+    tgl_sekarang = datetime.now()
+    tgl_sekarang_str = tgl_sekarang.strftime('%Y-%m-%d')
+    
+    conn = get_db_connection()
+    pinjaman = conn.execute('''
+        SELECT p.*, b.harga_buku, b.id as buku_id 
+        FROM peminjaman p 
+        JOIN buku b ON p.id_buku = b.id 
+        WHERE p.id = ?
+    ''', (pinjam_id,)).fetchone()
+    
+    if pinjaman:
+        # 1. Hitung denda keterlambatan (Rp 1.000 / hari)
+        tgl_seharusnya = datetime.strptime(pinjaman['tgl_kembali_seharusnya'], '%Y-%m-%d')
+        hari_terlambat = (tgl_sekarang - tgl_seharusnya).days
+        
+        denda_keterlambatan = 0
+        if hari_terlambat > 0:
+            denda_keterlambatan = hari_terlambat * 1000
+            
+        # 2. Logika Aturan Opsi A (Buku Rusak / Hilang)
+        denda_kondisi = 0
+        if status_kembali in ['Rusak', 'Hilang']:
+            denda_kondisi = pinjaman['harga_buku'] # Bebankan harga buku asli
+            # Update kondisi buku fisik di inventaris
+            conn.execute('UPDATE buku SET kondisi_buku = ? WHERE id = ?', (status_kembali, pinjaman['buku_id']))
+        else:
+            # Jika kembali normal, kembalikan stok ke rak
+            conn.execute('UPDATE buku SET stok = stok + 1 WHERE id = ?', (pinjaman['buku_id']))
+            
+        total_denda = denda_keterlambatan + denda_kondisi
+        
+        # 3. Update status peminjaman
+        conn.execute('''
+            UPDATE peminjaman 
+            SET tgl_dikembalikan = ?, status = ?, denda = ? 
+            WHERE id = ?
+        ''', (tgl_sekarang_str, 'Selesai (' + status_kembali + ')', total_denda, pinjam_id))
+        conn.commit()
+        
+        flash(f'Proses berhasil! Status: {status_kembali}. Total Denda: Rp {total_denda:,}', 'info')
+    conn.close()
+    return redirect(url_for('daftar_peminjaman'))
+
 @app.route('/koleksi')
 def koleksi_lengkap():
     # if not session.get('logged_in'):
@@ -328,6 +404,56 @@ def export_peminjaman():
     # Kirim file ke browser untuk di-download
     from flask import send_file
     return send_file(file_path, as_attachment=True)
+
+def init_db():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    
+    # 1. TABEL BUKU (Katalog & Inventaris Lengkap)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS buku (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            -- Data Katalog (Publik)
+            judul TEXT NOT NULL,
+            sub_judul TEXT,
+            penulis TEXT,
+            penerbit TEXT,
+            tahun_terbit TEXT,
+            isbn TEXT,
+            kategori TEXT,
+            sinopsis TEXT,
+            cover_img TEXT,
+            -- Data Inventaris (Internal Pustakawan)
+            id_buku_fisik TEXT UNIQUE, -- Barcode / ID Unik Eksemplar
+            nomor_panggil TEXT,        -- Call Number di Rak
+            lokasi_rak TEXT,
+            sumber_perolehan TEXT,     -- Pembelian / Hadiah / Sumbangan
+            tanggal_masuk TEXT,
+            kondisi_buku TEXT DEFAULT 'Baik', -- Baik / Rusak / Hilang
+            harga_buku INTEGER DEFAULT 0,     -- Untuk Pelaporan Aset & Denda Opsi A
+            stok INTEGER DEFAULT 1
+        )
+    ''')
+    
+    # 2. TABEL PEMINJAMAN (Mendukung Batas Waktu & Denda)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS peminjaman (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_buku INTEGER,
+            id_anggota TEXT, -- Nama Peminjam
+            tipe_user TEXT,  -- Siswa / Guru
+            kelas TEXT,
+            jurusan TEXT,
+            tgl_pinjam TEXT,
+            tgl_kembali_seharusnya TEXT,
+            tgl_dikembalikan TEXT,
+            status TEXT DEFAULT 'Dipinjam', -- Dipinjam / Kembali / Rusak / Hilang
+            denda INTEGER DEFAULT 0,
+            FOREIGN KEY(id_buku) REFERENCES buku(id)
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -15,7 +15,63 @@
 
     <hr class="text-muted opacity-25 mb-4">
 
-    {# LOGIKA UTAMA: Cek apakah ada hasil pencarian #}
+    <div class="row mt-2 g-3">
+        <div class="col-12">
+            <div class="p-4 p-md-5 rounded-3 border border-primary border-opacity-10 shadow-sm position-relative overflow-hidden" style="background: linear-gradient(135deg, #ffffff 0%, #f4f7ff 100%);">
+                <div class="position-absolute end-0 bottom-0 opacity-10 translate-middle-x d-none d-md-block" style="font-size: 8rem; pointer-events: none;">
+                    <i class="bi bi-cpu-fill text-primary"></i>
+                </div>
+                
+                <span class="badge bg-primary px-3 py-2 rounded-pill mb-3 text-uppercase tracking-wider small fw-bold">🚀 Tech Innovation Project</span>
+                <h3 class="fw-black text-dark mb-3">Selamat Datang di Ekosistem Perpustakaan Masa Depan</h3>
+                
+                <p class="text-secondary lead fs-6 mb-4" style="max-width: 800px; line-height: 1.7;">
+                    Sistem ini dirancang dan dikembangkan secara mandiri oleh <strong>Muhamad Yusra Agam (Software Engineering)</strong> sebagai wujud kontribusi nyata dalam memodernisasi infrastruktur literasi sekolah. Memadukan efisiensi otomatisasi arsitektur web modern, sistem ini hadir untuk menggantikan birokrasi pendataan manual menjadi ekosistem digital yang cerdas, transparan, dan akuntabel.
+                </p>
+                
+                <div class="row g-3 pt-2 border-top border-muted border-opacity-10 text-start">
+                    <div class="col-6 col-md-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-shield-check text-success fs-4"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold text-dark small">Secure System</h6>
+                                <small class="text-muted" style="font-size: 11px;">Admin RBAC Protected</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-phone text-primary fs-4"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold text-dark small">Responsive UI</h6>
+                                <small class="text-muted" style="font-size: 11px;">Optimized for Mobile</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-lightning-charge-fill text-warning fs-4"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold text-dark small">Realtime Asset</h6>
+                                <small class="text-muted" style="font-size: 11px;">DDC Class Tracking</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-git text-danger fs-4"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold text-dark small">Open Source</h6>
+                                <small class="text-muted" style="font-size: 11px;">GitHub Documented</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Cek apakah ada hasil pencarian #}
     {% if results %}
         <div class="table-responsive">
             <table class="table table-hover align-middle">
@@ -46,7 +102,7 @@
             </table>
         </div>
 
-    {# LOGIKA KEDUA: Jika tidak ada hasil, tapi user sedang mencari sesuatu (query ada) #}
+    {# Jika tidak ada hasil, tapi user sedang mencari sesuatu (query ada) #}
     {% elif query %}
         <div class="text-center py-5">
             <div class="mb-3">
@@ -57,7 +113,7 @@
             <a href="/koleksi" class="btn btn-outline-secondary btn-sm mt-2">Lihat Semua Koleksi</a>
         </div>
 
-    {# LOGIKA KETIGA: Kondisi awal saat halaman baru dibuka (opsional) #}
+    {# Kondisi awal saat halaman baru dibuka (opsional) #}
     {% else %}
         <div class="text-center py-4 text-muted">
             <p>Gunakan kolom di atas untuk mencari buku di perpustakaan.</p>

@@ -133,72 +133,99 @@
                     {% endif %}
                 </div>
 
-                <div class="col-md-8 p-5">
-                    <span class="badge bg-info text-dark mb-2 rounded-pill px-3 py-2 text-uppercase fw-bold">{{ buku.kategori if buku.kategori else 'Tanpa Kategori' }}</span>
-                    <h1 class="display-5 fw-bold text-dark mb-1">{{ buku.judul }}</h1>
-                    <p class="text-muted fs-5 mb-4">Karya: <span class="fw-bold text-dark">{{ buku.penulis if buku.penulis else 'Penulis Anonim' }}</span></p>
+                <div class="col-12 col-md-8 p-4">
+                    <h2 class="fw-bold text-dark mb-1">{{ buku.judul }}</h2>
+                    <h5 class="text-muted mb-4">{{ buku.sub_judul if buku.sub_judul else '' }}</h5>
                     
-                    <div class="row g-3 bg-white p-4 rounded-3 border mb-4 shadow-xs">
-                        <div class="col-6 col-md-4">
-                            <div class="small text-muted">LOKASI RAK</div>
-                            <div class="fw-bold fs-5 text-primary">Rak {{ buku.kode_rak if buku.kode_rak else '-' }} / Baris {{ buku.baris_rak if buku.baris_rak else '-' }}</div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-sm-6">
+                            <small class="text-muted d-block">Penulis / Pengarang</small>
+                            <span class="fw-semibold text-dark">{{ buku.penulis }}</span>
                         </div>
-                        <div class="col-6 col-md-4">
-                            <div class="small text-muted">STOK TERSEDIA</div>
-                            <div class="fw-bold fs-5 text-success">{{ buku.stok if buku.stok else '0' }} Buku</div>
+                        <div class="col-12 col-sm-6">
+                            <small class="text-muted d-block">ISBN</small>
+                            <span class="fw-semibold text-dark">{{ buku.isbn if buku.isbn else '-' }}</span>
                         </div>
-                        <div class="col-md-4">
-                            <div class="small text-muted">TGL MASUK INVENTARIS</div>
-                            <div class="fw-bold fs-6 text-dark">{{ buku.tanggal_masuk if buku.tanggal_masuk else '-' }}</div>
+                        <div class="col-12 col-sm-6">
+                            <small class="text-muted d-block">Penerbit & Tahun</small>
+                            <span class="fw-semibold text-dark">{{ buku.penerbit }} ({{ buku.tahun_terbit }})</span>
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <small class="text-muted d-block">Klasifikasi DDC / Kategori</small>
+                            <span class="badge bg-secondary">{{ buku.kategori }}</span>
+                        </div>
+                        
+                        <div class="col-12 pt-3 border-top">
+                            <h6 class="fw-bold text-uppercase text-primary small mb-3"><i class="bi bi-pin-angle"></i> Lokasi & Manajemen Fisik Buku</h6>
+                            <div class="row g-2 bg-white p-3 rounded shadow-xs border">
+                                <div class="col-6 col-sm-4">
+                                    <small class="text-muted d-block">ID / Barcode</small>
+                                    <code class="text-dark fw-bold">{{ buku.id_buku_fisik if buku.id_buku_fisik else '-' }}</code>
+                                </div>
+                                <div class="col-6 col-sm-4">
+                                    <small class="text-muted d-block">Nomor Panggil</small>
+                                    <span class="text-dark fw-semibold">{{ buku.nomor_panggil if buku.nomor_panggil else '-' }}</span>
+                                </div>
+                                <div class="col-6 col-sm-4">
+                                    <small class="text-muted d-block">Posisi Rak</small>
+                                    <span class="badge bg-dark">{{ buku.lokasi_rak if buku.lokasi_rak else '-' }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="d-grid mt-2">
-                        {% if buku.stok > 0 %}
-                            <a href="#areaPinjam" class="btn btn-warning btn-lg fw-bold text-dark"><i class="bi bi-book"></i> Pinjam Buku Ini Sekarang</a>
-                        {% else %}
-                            <button class="btn btn-secondary btn-lg fw-bold disabled"><i class="bi bi-x-circle"></i> Stok Sedang Kosong</button>
-                        {% endif %}
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-dark">Sinopsis Buku</h6>
+                        <p class="text-secondary small" style="line-height: 1.6;">{{ buku.sinopsis if buku.sinopsis else 'Tidak ada sinopsis untuk buku ini.' }}</p>
                     </div>
-                    {% if buku.stok > 0 %}
-                    <div id="areaPinjam" class="card p-4 mb-5 border-primary shadow mt-4">
-                        <h5 class="fw-bold text-primary">Form Peminjaman</h5>
-                        <form action="/pinjam/{{ buku.id }}" method="POST">
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="fw-bold small">Tipe Peminjam</label>
-                                    <select name="tipe_user" class="form-select" required>
-                                        <option value="Murid">Murid</option>
-                                        <option value="Guru">Guru</option>
-                                    </select>
+
+                    <div class="card border-0 shadow-sm rounded-3 mt-4" style="background-color: #f8f9fa;">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-bookmark-plus-fill text-primary"></i> Ajukan Formulir Peminjaman</h5>
+                            
+                            {% if buku.stok > 0 %}
+                            <form action="/pinjam/{{ buku.id }}" method="POST">
+                                <div class="row">
+                                    <div class="col-12 mb-3">
+                                        <label class="fw-bold small mb-1">Nama Lengkap Peminjam</label>
+                                        <input type="text" name="nama_peminjam" class="form-control form-control-sm shadow-xs" placeholder="Ketik nama Anda..." required>
+                                    </div>
+                                    <div class="col-12 col-sm-6 mb-3">
+                                        <label class="fw-bold small mb-1">Tipe Anggota</label>
+                                        <select name="tipe_user" class="form-select form-select-sm" required>
+                                            <option value="Siswa">Siswa Sekolah</option>
+                                            <option value="Guru/Staff">Guru / Staff Perpustakaan</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-sm-6 mb-3">
+                                        <label class="fw-bold small mb-1">Durasi Batas Waktu Pinjam</label>
+                                        <select name="durasi_pinjam" class="form-select form-select-sm" required>
+                                            <option value="7">7 Hari (1 Minggu Resmi)</option>
+                                            <option value="14" selected>14 Hari (2 Minggu Maksimal)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="fw-bold small mb-1">Kelas</label>
+                                        <select name="kelas" class="form-select form-select-sm" required>
+                                            <option value="-">- (Khusus Guru)</option>
+                                            <option value="X">Kelas 10 (X)</option>
+                                            <option value="XI">Kelas 11 (XI)</option>
+                                            <option value="XII">Kelas 12 (XII)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="fw-bold small mb-1">Jurusan / Divisi</label>
+                                        <input type="text" name="jurusan" class="form-control form-control-sm" placeholder="Contoh: RPL" required>
+                                    </div>
                                 </div>
-                                <div class="col-md-8 mb-3">
-                                    <label class="fw-bold small">Nama Lengkap</label>
-                                    <input type="text" name="nama_peminjam" class="form-control" placeholder="Masukkan nama peminjam" required>
-                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold mt-2 shadow-sm">Konfirmasi Pinjam Buku Sekarang</button>
+                            </form>
+                            {% else %}
+                            <div class="alert alert-danger mb-0 border-0 shadow-xs">
+                                <i class="bi bi-exclamation-triangle-fill"></i> <strong>Mohon Maaf:</strong> Seluruh eksemplar fisik buku ini sedang dipinjam atau dalam kondisi perbaikan.
                             </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="fw-bold small">Kelas (Pilih '-' jika Guru)</label>
-                                    <select name="kelas" class="form-select" required>
-                                        <option value="-">- (Khusus Guru/Staff)</option>
-                                        <option value="X">Kelas 10 (X)</option>
-                                        <option value="XI">Kelas 11 (XI)</option>
-                                        <option value="XII">Kelas 12 (XII)</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="fw-bold small">Jurusan</label>
-                                    <input type="text" name="jurusan" class="form-control" placeholder="Contoh: RPL" required>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100 fw-bold">Konfirmasi Pinjam Buku</button>
-                        </form>
-                        {% else %}
-                        <div id="areaPinjam" class="alert alert-danger mt-4 shadow-sm border-0">
-                            <i class="bi bi-exclamation-triangle-fill"></i> <strong>Mohon Maaf:</strong> Buku ini tidak dapat dipinjam sementara waktu karena stok di gudang sedang kosong.
+                            {% endif %}
                         </div>
-                        {% endif %}
                     </div>
                 </div>
             </div>
