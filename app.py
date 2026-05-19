@@ -24,7 +24,8 @@ def login():
             flash('Selamat datang, Admin!', 'success')
             return redirect(url_for('koleksi_lengkap'))
         else:
-            flash('Username atau password salah!', 'danger')
+            # Notifikasi ini sekarang akan langsung tampil di login.html berkat layout.html global
+            flash('Gagal Login! Username atau password salah.', 'danger')
             
     return render_template('login.html')
 
@@ -263,40 +264,6 @@ def upload_cover(id):
         
     return redirect(url_for('detail_buku', id=id))
 
-@app.route('/pinjam/<int:buku_id>', methods=['POST'])
-def pinjam_buku(buku_id):
-    nama = request.form.get('nama_peminjam')
-    tipe_user = request.form.get('tipe_user')
-    kelas = request.form.get('kelas', '-')
-    jurusan = request.form.get('jurusan', '-')
-    
-    # Menangkap durasi dinamis (7 atau 14 hari) dari formulir baru
-    durasi_input = request.form.get('durasi_pinjam')
-    durasi = int(durasi_input) if durasi_input else 14
-    
-    tgl_sekarang = datetime.now()
-    tgl_pinjam_str = tgl_sekarang.strftime('%Y-%m-%d')
-    tgl_kembali_str = (tgl_sekarang + timedelta(days=durasi)).strftime('%Y-%m-%d')
-    
-    conn = get_db_connection()
-    buku = conn.execute('SELECT stok FROM buku WHERE id = ?', (buku_id,)).fetchone()
-    
-    if buku and buku['stok'] > 0:
-        # Kurangi stok buku di rak
-        conn.execute('UPDATE buku SET stok = stok - 1 WHERE id = ?', (buku_id,))
-        # Simpan data transaksi ke database
-        conn.execute('''
-            INSERT INTO peminjaman (id_buku, id_anggota, tipe_user, kelas, jurusan, tgl_pinjam, tgl_kembali_seharusnya, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (buku_id, nama, tipe_user, kelas, jurusan, tgl_pinjam_str, tgl_kembali_str, 'Dipinjam'))
-        conn.commit()
-        flash('Buku berhasil dipinjam! Selamat membaca.', 'success')
-    else:
-        flash('Mohon maaf, stok buku ini sedang kosong.', 'danger')
-        
-    conn.close()
-    return redirect(url_for('daftar_peminjaman'))
-
 @app.route('/peminjaman')
 def daftar_peminjaman():
     if not session.get('logged_in'):
@@ -339,53 +306,53 @@ def daftar_peminjaman():
 
     return render_template('peminjaman.html', peminjaman=peminjaman_final)
 
-@app.route('/return/<int:peminjaman_id>')
-def kembali_buku(peminjaman_id):
-    conn = get_db_connection()
-    peminjaman = conn.execute('SELECT id_buku FROM peminjaman WHERE id = ?', (peminjaman_id,)).fetchone()
-    if peminjaman:
-        conn.execute('UPDATE peminjaman SET status = ? WHERE id = ?', ('Kembali', peminjaman_id))
-        conn.execute('UPDATE buku SET stok = stok + 1 WHERE id = ?', (peminjaman['id_buku'],))
-        conn.commit()
-    conn.close()
-    return redirect(url_for('daftar_peminjaman'))
-
 @app.route('/pinjam/<int:buku_id>', methods=['POST'])
-def proses_pinjam(buku_id):
+def proses_pinjam_buku(buku_id):
     nama = request.form.get('nama_peminjam')
     tipe_user = request.form.get('tipe_user')
-    kelas = request.form.get('kelas')
-    jurusan = request.form.get('jurusan')
-    durasi = int(request.form.get('durasi_pinjam')) # 7 atau 14 hari
+    kelas = request.form.get('kelas', '-')
+    jurusan = request.form.get('jurusan', '-')
+    
+    # Menangkap durasi dinamis (7 atau 14 hari) dari form
+    durasi_input = request.form.get('durasi_pinjam')
+    durasi = int(durasi_input) if durasi_input else 14
     
     tgl_sekarang = datetime.now()
     tgl_pinjam_str = tgl_sekarang.strftime('%Y-%m-%d')
     tgl_kembali_str = (tgl_sekarang + timedelta(days=durasi)).strftime('%Y-%m-%d')
     
     conn = get_db_connection()
-    # Cek stok
     buku = conn.execute('SELECT stok FROM buku WHERE id = ?', (buku_id,)).fetchone()
+    
     if buku and buku['stok'] > 0:
-        # Kurangi stok dan masukkan data peminjaman
-        conn.execute('UPDATE buku SET stok = stok - 1 WHERE id = ?', (buku_id,))
-        conn.execute('''
-            INSERT INTO peminjaman (id_buku, id_anggota, tipe_user, kelas, jurusan, tgl_pinjam, tgl_kembali_seharusnya)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (buku_id, nama, tipe_user, kelas, jurusan, tgl_pinjam_str, tgl_kembali_str))
-        conn.commit()
-        flash('Buku berhasil dipinjam! Selamat membaca.', 'success')
+        try:
+            # 1. Kurangi stok buku di rak
+            conn.execute('UPDATE buku SET stok = stok - 1 WHERE id = ?', (buku_id,))
+            
+            # 2. Simpan data transaksi ke database peminjaman
+            conn.execute('''
+                INSERT INTO peminjaman (id_buku, id_anggota, tipe_user, kelas, jurusan, tgl_pinjam, tgl_kembali_seharusnya, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (buku_id, nama, tipe_user, kelas, jurusan, tgl_pinjam_str, tgl_kembali_str, 'Dipinjam'))
+            
+            conn.commit()
+            flash('Berhasil Meminjam! Silakan ambil buku fisik di perpustakaan.', 'success')
+        except sqlite3.Error as e:
+            flash(f'Gagal memproses peminjaman: {str(e)}', 'danger')
     else:
-        flash('Stok buku kosong!', 'danger')
+        flash('Mohon maaf, stok buku ini sedang kosong atau tidak tersedia.', 'danger')
+        
     conn.close()
+    # Memastikan user tetap berada di halaman detail buku setelah klik pinjam
     return redirect(url_for('detail_buku', id=buku_id))
 
 @app.route('/kembalikan/<int:pinjam_id>', methods=['POST'])
 def proses_kembalikan(pinjam_id):
     if not session.get('logged_in'):
-        flash('Akses ditolak!', 'danger')
+        flash('Akses ditolak! Anda harus login sebagai admin.', 'danger')
         return redirect(url_for('login'))
 
-    status_kembali = request.form.get('status_kembali') # 'Normal', 'Rusak', 'Hilang'
+    status_kembali = request.form.get('status_kembali')  # 'Normal', 'Rusak', 'Hilang'
     tgl_sekarang = datetime.now()
     tgl_sekarang_str = tgl_sekarang.strftime('%Y-%m-%d')
     
@@ -402,34 +369,40 @@ def proses_kembalikan(pinjam_id):
         denda_keterlambatan = 0
         if pinjaman['tgl_kembali_seharusnya']:
             tgl_seharusnya = datetime.strptime(pinjaman['tgl_kembali_seharusnya'], '%Y-%m-%d')
-            hari_terlambat = (tgl_sekarang - tgl_seharusnya).days
+            # Set jam, menit, detik ke 0 untuk perbandingan tanggal murni
+            hari_terlambat = (tgl_sekarang.date() - tgl_seharusnya.date()).days
             if hari_terlambat > 0:
                 denda_keterlambatan = hari_terlambat * 1000
             
-        # 2. Logika Aturan Opsi A (Buku Rusak / Hilang)
+        # 2. Logika Aturan Denda Berdasarkan Kondisi Buku (Buku Rusak / Hilang)
         denda_kondisi = 0
-        # Jika kolom harga_buku kosong di db, berikan nilai default 0
         harga_buku_asli = pinjaman['harga_buku'] if pinjaman['harga_buku'] else 0
         
         if status_kembali in ['Rusak', 'Hilang']:
             denda_kondisi = harga_buku_asli  # Membebankan harga buku riil ke denda siswa
+            # Perbarui kondisi buku di database katalog utama
             conn.execute('UPDATE buku SET kondisi_buku = ? WHERE id = ?', (status_kembali, pinjaman['buku_id']))
         else:
             # Jika kembali normal, kembalikan 1 eksemplar stok ke rak buku
-            conn.execute('UPDATE buku SET stok = stok + 1 WHERE id = ?', (pinjaman['buku_id']))
+            conn.execute('UPDATE buku SET stok = stok + 1 WHERE id = ?', (pinjaman['buku_id'],))
             
         total_denda = denda_keterlambatan + denda_kondisi
         status_final = f"Selesai ({status_kembali})"
         
-        # 3. Kunci data transaksi peminjaman
-        conn.execute('''
-            UPDATE peminjaman 
-            SET tgl_dikembalikan = ?, status = ?, denda = ? 
-            WHERE id = ?
-        ''', (tgl_sekarang_str, status_final, total_denda, pinjam_id))
-        conn.commit()
-        
-        flash(f'Buku berhasil diproses! Status Fisik: {status_kembali}. Total Akumulasi Denda: Rp {total_denda:,}', 'success')
+        try:
+            # 3. Kunci data transaksi peminjaman
+            conn.execute('''
+                UPDATE peminjaman 
+                SET tgl_dikembalikan = ?, status = ?, denda = ? 
+                WHERE id = ?
+            ''', (tgl_sekarang_str, status_final, total_denda, pinjam_id))
+            conn.commit()
+            
+            flash(f'Buku berhasil diproses! Status Fisik: {status_kembali}. Total Akumulasi Denda: Rp {total_denda:,}', 'success')
+        except sqlite3.Error as e:
+            flash(f'Gagal memperbarui database transaksi: {str(e)}', 'danger')
+    else:
+        flash('Data transaksi peminjaman tidak ditemukan!', 'danger')
     
     conn.close()
     return redirect(url_for('daftar_peminjaman'))
