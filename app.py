@@ -93,7 +93,7 @@ def tambah_buku():
         nomor_panggil = request.form.get('nomor_panggil')
         lokasi_rak = request.form.get('lokasi_rak')
         sumber_perolehan = request.form.get('sumber_perolehan')
-        tanggal_masuk = request.form.get('tanggal_masuk')
+        tanggal_masuk = request.form.get('tanggal_masuk', datetime.now().strftime('%Y-%m-%d'))
         kondisi_buku = request.form.get('kondisi_buku', 'Baik')
         
         # Penanganan data angka (Harga & Stok)
@@ -131,48 +131,68 @@ def tambah_buku():
             
         return redirect(url_for('koleksi_lengkap'))
         
-    return render_template('tambah_buku.html')
+    # Jika sekiranya ada yang mengakses /add via GET langsung
+    return redirect(url_for('koleksi_lengkap'))
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit_buku(id):
     if not session.get('logged_in'):
         flash('Silakan login terlebih dahulu!', 'danger')
         return redirect(url_for('login'))
-    
+        
     conn = get_db_connection()
-    book = conn.execute('SELECT * FROM buku WHERE id = ?', (id,)).fetchone()
-
-    if request.method == 'POST':
-        conn.execute('''
-            UPDATE buku SET 
-                judul=?, sub_judul=?, penulis=?, penerbit=?, tahun_terbit=?, 
-                isbn=?, kategori=?, sinopsis=?, id_buku_fisik=?, 
-                nomor_panggil=?, lokasi_rak=?, harga_buku=?, stok=?
-            WHERE id=?
-        ''', (
-            request.form.get('judul'),
-            request.form.get('sub_judul'),
-            request.form.get('penulis'),
-            request.form.get('penerbit'),
-            request.form.get('tahun_terbit'),
-            request.form.get('isbn'),
-            request.form.get('kategori'),
-            request.form.get('sinopsis'),
-            request.form.get('id_buku_fisik'),
-            request.form.get('nomor_panggil'),
-            request.form.get('lokasi_rak'),
-            request.form.get('harga_buku', 0),
-            request.form.get('stok'),
-            id
-        ))
-        conn.commit()
-        conn.close()
-        flash('Data buku berhasil diperbarui!', 'success')
-        # Agar setelah edit kembali ke halaman detail buku tersebut
-        return redirect(url_for('detail_buku', id=id))
+    buku = conn.execute('SELECT * FROM buku WHERE id = ?', (id,)).fetchone()
     
-    conn.close()
-    return render_template('edit.html', buku=book)
+    if buku is None:
+        conn.close()
+        flash('Data buku tidak ditemukan!', 'danger')
+        return redirect(url_for('koleksi_lengkap'))
+
+    if request.method == 'GET':
+        # Mengambil URL halaman sebelumnya secara dinamis, jika tidak terdeteksi default ke /koleksi
+        back_url = request.referrer or url_for('koleksi_lengkap')
+        conn.close()
+        return render_template('edit.html', buku=buku, back_url=back_url)
+        
+    if request.method == 'POST':
+        judul = request.form.get('judul')
+        sub_judul = request.form.get('sub_judul', '')
+        penulis = request.form.get('penulis')
+        penerbit = request.form.get('penerbit')
+        tahun_terbit = request.form.get('tahun_terbit')
+        isbn = request.form.get('isbn')
+        kategori = request.form.get('kategori')
+        sinopsis = request.form.get('sinopsis')
+        kondisi_buku = request.form.get('kondisi_buku', 'Baik')
+        nomor_panggil = request.form.get('nomor_panggil')
+        lokasi_rak = request.form.get('lokasi_rak')
+        
+        harga_input = request.form.get('harga_buku')
+        harga_buku = int(harga_input) if harga_input else 0
+        
+        stok_input = request.form.get('stok')
+        stok = int(stok_input) if stok_input else 1
+        
+        # Ambil kembali back_url yang dikirim tersembunyi dari form HTML
+        back_url_post = request.form.get('back_url') or url_for('koleksi_lengkap')
+
+        try:
+            conn.execute('''
+                UPDATE buku SET 
+                    judul=?, sub_judul=?, penulis=?, penerbit=?, tahun_terbit=?, isbn=?, kategori=?, sinopsis=?,
+                    kondisi_buku=?, nomor_panggil=?, lokasi_rak=?, harga_buku=?, stok=?
+                WHERE id=?
+            ''', (judul, sub_judul, penulis, penerbit, tahun_terbit, isbn, kategori, sinopsis,
+                  kondisi_buku, nomor_panggil, lokasi_rak, harga_buku, stok, id))
+            conn.commit()
+            flash('Data logistik aset buku berhasil diperbarui!', 'success')
+        except sqlite3.Error as e:
+            flash(f'Gagal memperbarui data: {str(e)}', 'danger')
+        finally:
+            conn.close()
+            
+        # Mengembalikan admin ke halaman asal klik tadi setelah berhasil menyimpan data
+        return redirect(back_url_post)
 
 # UPDATE FUNGSI HAPUS: Supaya tetap di halaman terakhir
 @app.route('/delete/<int:id>')
@@ -416,53 +436,47 @@ def proses_kembalikan(pinjam_id):
 
 @app.route('/koleksi')
 def koleksi_lengkap():
-    # if not session.get('logged_in'):
-       # return redirect(url_for('login'))
-        
+    # Fitur ini sengaja dibuka untuk umum agar siswa bisa melihat katalog
     conn = get_db_connection()
-    all_books = conn.execute('SELECT * FROM buku ORDER BY id DESC').fetchall()
     
-    # Statistik Dasar
-    total_judul = conn.execute('SELECT COUNT(*) FROM buku').fetchone()[0]
-    total_dipinjam = conn.execute('SELECT COUNT(*) FROM peminjaman WHERE status = "Dipinjam"').fetchone()[0]
+    # Menangani input dari form pencarian (Gabungan dengan fungsi search_database lama)
+    query = request.args.get('query', '').strip()
+    if query:
+        # Jika ada pencarian, filter datanya
+        buku = conn.execute('''
+            SELECT * FROM buku 
+            WHERE judul LIKE ? OR penulis LIKE ? OR id_buku_fisik LIKE ?
+            ORDER BY id DESC
+        ''', (f'%{query}%', f'%{query}%', f'%{query}%')).fetchall()
+    else:
+        # Jika tidak ada pencarian, tampilkan semua
+        buku = conn.execute('SELECT * FROM buku ORDER BY id DESC').fetchall()
+    
+    # 1. Statistik Dasar & Riil
+    total_buku = conn.execute('SELECT SUM(stok) FROM buku').fetchone()[0] or 0
+    total_judul = conn.execute('SELECT COUNT(*) FROM buku').fetchone()[0] or 0
+    total_dipinjam = conn.execute('SELECT COUNT(*) FROM peminjaman WHERE status = "Dipinjam"').fetchone()[0] or 0
 
-    top_kategori = conn.execute('''
-        SELECT kategori, COUNT(*) as jumlah 
-        FROM buku 
-        GROUP BY kategori 
-        ORDER BY jumlah DESC LIMIT 1
-    ''').fetchone()
-    
-    # Data untuk Grafik: Menghitung jumlah buku per kategori
-    query_chart = conn.execute('SELECT kategori, COUNT(*) as jumlah FROM buku GROUP BY kategori').fetchall()
-    
-    # Ubah ke format list agar bisa dibaca JavaScript
-    labels = [row['kategori'] for row in query_chart]
-    values = [row['jumlah'] for row in query_chart]
+    # 2. Data Buku Populer (Paling sering dipinjam)
+    buku_populer = conn.execute('''
+        SELECT b.judul, b.kategori, COUNT(p.id) as total_dipinjam
+        FROM buku b
+        JOIN peminjaman p ON b.id = p.id_buku
+        GROUP BY b.id
+        ORDER BY total_dipinjam DESC
+        LIMIT 5
+    ''').fetchall()
     
     conn.close()
     
+    # Mengirim semua variabel dengan nama yang tepat ke koleksi.html
     return render_template('koleksi.html', 
-                           books=all_books, 
+                           buku=buku, 
+                           query=query,
+                           total_buku=total_buku,
                            total_judul=total_judul,
                            total_dipinjam=total_dipinjam,
-                           top_kategori=top_kategori['kategori'] if top_kategori else '-',
-                           labels=json.dumps(labels), # Kirim sebagai JSON
-                           values=json.dumps(values)) # Kirim sebagai JSON
-
-@app.route('/search_database')
-def search_database():
-    query = request.args.get('query')
-    results = []
-    if query:
-        conn = get_db_connection()
-        # Mencari buku dan menampilkan hasilnya di format tabel koleksi
-        results = conn.execute('SELECT * FROM buku WHERE judul LIKE ? OR penulis LIKE ?', 
-                               ('%' + query + '%', '%' + query + '%')).fetchall()
-        conn.close()
-    
-    # Kita kirim hasil pencarian ke koleksi.html menggunakan variabel 'books'
-    return render_template('koleksi.html', books=results, query=query)
+                           buku_populer=buku_populer)
 
 import pandas as pd # Tambahkan import ini di bagian atas app.py
 

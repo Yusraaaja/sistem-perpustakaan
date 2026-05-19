@@ -3,184 +3,267 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
     <div>
-        <h4 class="fw-bold mb-0 text-dark">Database Utama Inventaris</h4>
-        <p class="text-muted small mb-0">Total seluruh koleksi buku yang terdaftar</p>
+        <h4 class="fw-bold mb-0 text-dark">Sistem Manajemen Aset & Inventaris</h4>
+        <p class="text-muted small mb-0">Kelola katalog publik, lokasi logistik rak, dan pelaporan denda</p>
     </div>
     
-    <form action="/search_database" method="GET" class="d-flex shadow-sm" style="width: 350px;">
-        <input type="text" name="query" class="form-control form-control-sm border-end-0 rounded-start" 
-               placeholder="Cari di database..." value="{{ query or '' }}">
-        <button type="submit" class="btn btn-sm btn-dark rounded-end px-3">
-            <i class="bi bi-search"></i> Cari
-        </button> </form>
+    <div class="d-flex gap-2">
+        {% if session.get('logged_in') %}
+        <button type="button" class="btn btn-primary shadow-sm fw-bold px-3 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addBookModal">
+            <i class="bi bi-journal-plus fs-5"></i> + Tambah Buku Baru
+        </button>
+        {% endif %}
+        
+        <form action="/koleksi" method="GET" class="d-flex shadow-sm" style="width: 300px;">
+            <input type="text" name="query" class="form-control form-control-sm border-end-0 rounded-start" 
+                   placeholder="Cari Judul / Barcode / Penulis..." value="{{ query or '' }}">
+            <button type="submit" class="btn btn-sm btn-dark rounded-end px-3">
+                <i class="bi bi-search"></i>
+            </button>
+        </form>
+    </div>
 </div>
 
-{# --- MODE 1: JIKA ADMIN SEDANG MELAKUKAN PENCARIAN --- #}
-{% if query %}
-    <div class="card shadow-sm border-0 rounded-3 overflow-hidden mb-4">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Hasil Pencarian untuk: <strong>"{{ query }}"</strong></h6>
-            <a href="/koleksi" class="btn btn-sm btn-outline-danger">X Reset Pencarian</a>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0 small py-2" role="alert">
+        <i class="bi {{ 'bi-check-circle-fill' if category == 'success' else 'bi-exclamation-triangle-fill' }} me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-primary text-white p-3 rounded-3">
+            <small class="text-white-50 fw-bold text-uppercase">Total Volume Buku</small>
+            <h3 class="fw-bold mb-0 mt-1">{{ total_buku }} <span class="fs-6 fw-normal">Eks</span></h3>
         </div>
-        
-        {% if results %}
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-dark text-white p-3 rounded-3">
+            <small class="text-white-50 fw-bold text-uppercase">Variasi Judul</small>
+            <h3 class="fw-bold mb-0 mt-1">{{ total_judul }} <span class="fs-6 fw-normal">Judul</span></h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-warning text-dark p-3 rounded-3">
+            <small class="text-dark-50 fw-bold text-uppercase">Sedang Dipinjam</small>
+            <h3 class="fw-bold mb-0 mt-1">{{ total_dipinjam }} <span class="fs-6 fw-normal">Siswa</span></h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-danger text-white p-3 rounded-3">
+            <small class="text-white-50 fw-bold text-uppercase">Buku Populer Aktif</small>
+            <h3 class="fw-bold mb-0 mt-1">{{ buku_populer|length }} <span class="fs-6 fw-normal">Koleksi</span></h3>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-9">
+        {% if query %}
+            <div class="alert alert-info border-0 shadow-sm small d-flex justify-content-between align-items-center py-2 mb-3">
+                <span><i class="bi bi-info-circle me-2"></i>Menampilkan hasil pencarian untuk: <strong>"{{ query }}"</strong></span>
+                <a href="/koleksi" class="btn btn-sm btn-link text-danger text-decoration-none fw-bold p-0">Clear Filter</a>
+            </div>
+        {% endif %}
+
+        <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th class="ps-4">Judul & Penulis</th>
-                            <th>Kategori</th>
-                            <th>Stok</th>
+                            <th class="ps-3" style="width: 15%;">ID/Barcode</th>
+                            <th style="width: 40%;">Detail Informasi Buku</th>
+                            <th style="width: 20%;">Kategori</th>
+                            <th style="width: 15%;">Lokasi Rak</th>
+                            <th class="text-center" style="width: 10%;">Stok</th>
                             {% if session.get('logged_in') %}
-                                <th class="text-center pe-4">Aksi</th>
+                            <th class="text-center pe-3" style="width: 15%;">Aksi</th>
                             {% endif %}
                         </tr>
                     </thead>
                     <tbody>
-                        {% for b in results %}
-                        <tr>
-                            <td class="ps-4">
-                                <a href="/buku/{{ b.id }}" class="text-decoration-none text-dark fw-bold d-block">{{ b.judul }}</a>
-                                <small class="text-secondary">{{ b.penulis if b.penulis else 'Anonim' }}</small>
-                            </td>
-                            <td><span class="badge bg-info text-dark rounded-pill px-3">{{ b.kategori if b.kategori else 'Umum' }}</span></td>
-                            <td>
-                                <span class="badge {{ 'bg-success' if b.stok > 0 else 'bg-danger' }}">
-                                    {{ b.stok }}
-                                </span>
-                            </td>
-                            {% if session.get('logged_in') %}
-                                <td class="text-center pe-4">
-                                    <div class="btn-group shadow-xs">
-                                        <a href="/edit/{{ b.id }}" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-pencil"></i> Edit
-                                        </a>
-                                        <a href="/delete/{{ b.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin ingin menghapus buku ini?')">
-                                            <i class="bi bi-trash"></i> Hapus
-                                        </a>
+                        {% if buku %}
+                            {% for b in buku %}
+                            <tr>
+                                <td class="ps-3 font-monospace text-muted small">{{ b.id_buku_fisik }}</td>
+                                <td>
+                                    <a href="/buku/{{ b.id }}" class="fw-bold text-primary text-decoration-none d-block mb-0-link">
+                                        {{ b.judul }}
+                                    </a>
+                                    {% if b.sub_judul %}
+                                        <small class="text-muted d-block italic small mb-1">{{ b.sub_judul }}</small>
+                                    {% endif %}
+                                    <small class="text-secondary d-block" style="font-size: 0.8rem;">
+                                        Penulis: {{ b.penulis }} | Penerbit: {{ b.penerbit or '-' }}
+                                    </small>
+                                </td>
+                                <td><span class="badge bg-light text-dark border px-3 py-1.5 rounded-pill">{{ b.kategori }}</span></td>
+                                <td class="small fw-semibold text-secondary"><i class="bi bi-box-seam me-1"></i>{{ b.lokasi_rak or 'Belum Diatur' }}</td>
+                                <td class="text-center">
+                                    <span class="badge {{ 'bg-success' if b.stok > 0 else 'bg-danger' }} rounded-2 px-2 py-1">
+                                        {{ b.stok }} Eks
+                                    </span>
+                                </td>
+                                {% if session.get('logged_in') %}
+                                <td class="text-center pe-3">
+                                    <div class="btn-group btn-group-sm shadow-sm">
+                                        <a href="/edit/{{ b.id }}" class="btn btn-outline-primary"><i class="bi bi-pencil-square"></i></a>
+                                        <a href="/delete/{{ b.id }}" class="btn btn-outline-danger" onclick="return confirm('Hapus aset buku ini dari gudang sistem?')"><i class="bi bi-trash"></i></a>
                                     </div>
                                 </td>
-                            {% endif %}
-                        </tr>
-                        {% endfor %}
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-5 bg-light text-muted">
+                                    <i class="bi bi-folder-x text-secondary d-block mb-2" style="font-size: 2.5rem;"></i>
+                                    <h6 class="fw-bold text-dark mb-1">Data Koleksi Tidak Ditemukan</h6>
+                                    <p class="small mb-0">Kata kunci pencarian tidak cocok dengan judul, pengarang, maupun ID fisik mana pun.</p>
+                                    <a href="/koleksi" class="btn btn-sm btn-outline-dark mt-3 px-4">Muat Ulang Semua Data</a>
+                                </td>
+                            </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
-        {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-database-exclamation text-warning" style="font-size: 3rem;"></i>
-                <h5 class="fw-bold mt-3">Data Tidak Ditemukan</h5>
-                <p class="text-muted">Tidak ada buku dalam database yang cocok dengan kata kunci tersebut.</p>
-            </div>
-        {% endif %}
-    </div>
-
-{# --- MODE 2: TAMPILAN DASHBOARD DEFAULT JIKA TIDAK MENCARI --- #}
-{% else %}
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card bg-primary text-white border-0 shadow-sm p-3">
-                <small class="opacity-75">Total Judul Buku</small>
-                <h2 class="fw-bold mb-0">{{ total_judul }}</h2>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card bg-warning text-dark border-0 shadow-sm p-3">
-                <small class="opacity-75">Buku Sedang Dipinjam</small>
-                <h2 class="fw-bold mb-0">{{ total_dipinjam }}</h2>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card bg-success text-white border-0 shadow-sm p-3">
-                <small class="opacity-75">Kategori Terpopuler</small>
-                <h4 class="fw-bold mb-0">{{ top_kategori }}</h4>
-            </div>
         </div>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card shadow-sm border-0 p-4">
-                <h5 class="fw-bold mb-3">Distribusi Kategori Buku</h5>
-                <div style="height: 300px;">
-                    <canvas id="categoryChart"></canvas>
+    <div class="col-lg-3">
+        <div class="card shadow-sm border-0 rounded-3 p-3 bg-white h-100">
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-fire text-danger me-2"></i>Peminjaman Populer</h6>
+            
+            {% if buku_populer %}
+                <ol class="list-group list-group-numbered list-group-flush">
+                {% for bp in buku_populer %}
+                    <li class="list-group-item d-flex justify-content-between align-items-start px-0 py-2 small">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold text-truncate" style="max-width: 150px;">{{ bp.judul }}</div>
+                            <span class="text-muted" style="font-size: 0.75rem;">{{ bp.kategori }}</span>
+                        </div>
+                        <span class="badge bg-danger rounded-pill">{{ bp.total_dipinjam }}x Pinjam</span>
+                    </li>
+                {% endfor %}
+                </ol>
+            {% else %}
+                <div class="text-center py-4 text-muted small italic">
+                    <i class="bi bi-graph-up d-block mb-1 text-black-50"></i> Belum ada rekaman sirkulasi transaksi.
                 </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addBookModal" tabindex="-1" aria-labelledby="addBookModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white py-3">
+                <h5 class="modal-title fw-bold small-title" id="addBookModalLabel">
+                    <i class="bi bi-file-earmark-medical text-primary me-2"></i> Registrasi Katalog & Manajemen Aset Baru
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        const rawLabels = '{{ labels|safe }}';
-        const rawValues = '{{ values|safe }}';
-        const ctx = document.getElementById('categoryChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: JSON.parse(rawLabels),
-                datasets: [{
-                    label: 'Jumlah Buku',
-                    data: JSON.parse(rawValues),
-                    backgroundColor: 'rgba(52, 152, 219, 0.7)',
-                    borderColor: 'rgba(52, 152, 219, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
-                }
-            }
-        });
-    </script>
-
-    <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-dark">
-                    <tr>
-                        <th class="ps-4">Tgl Masuk</th>
-                        <th>Judul & Penulis</th>
-                        <th>Kategori</th>
-                        <th>Stok</th>
-                        {% if session.get('logged_in') %}
-                            <th class="text-center pe-4">Aksi</th>
-                        {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for b in books %}
-                    <tr>
-                        <td class="ps-4"><small class="text-muted">{{ b.tanggal_masuk if b.tanggal_masuk else '-' }}</small></td>
-                        <td>
-                            <a href="/buku/{{ b.id }}" class="text-decoration-none text-dark fw-bold d-block">{{ b.judul }}</a>
-                            <small class="text-secondary">{{ b.penulis if b.penulis else 'Anonim' }}</small>
-                        </td>
-                        <td><span class="badge bg-info text-dark rounded-pill px-3">{{ b.kategori if b.kategori else 'Umum' }}</span></td>
-                        <td>
-                            <span class="badge {{ 'bg-success' if b.stok > 0 else 'bg-danger' }}">
-                                {{ b.stok }}
-                            </span>
-                        </td>
-                        {% if session.get('logged_in') %}
-                        <td class="text-center pe-4">
-                            <div class="btn-group shadow-xs">
-                                <a href="/edit/{{ b.id }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i> Edit
-                                </a>
-                                <a href="/delete/{{ b.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin ingin menghapus?')">
-                                    <i class="bi bi-trash"></i> Hapus
-                                </a>
+            
+            <form action="/add" method="POST" enctype="multipart/form-data">
+                <div class="modal-body p-4" style="max-height: 70vh; overflow-y: auto;">
+                    
+                    <div class="row g-4">
+                        <div class="col-md-6 border-end">
+                            <h6 class="fw-bold text-primary text-uppercase small mb-3 pb-1 border-bottom"><i class="bi bi-globe me-1"></i> I. Katalog Informasi Publik</h6>
+                            
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Judul Utama Buku *</label>
+                                <input type="text" name="judul" class="form-control form-control-sm" placeholder="Wajib diisi" required>
                             </div>
-                        </td>
-                        {% endif %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Sub Judul / Keterangan Edisi</label>
+                                <input type="text" name="sub_judul" class="form-control form-control-sm" placeholder="Edisi Revisi / Jilid 1 (Opsional)">
+                            </div>
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Nama Penulis *</label>
+                                <input type="text" name="penulis" class="form-control form-control-sm" placeholder="Nama penulis asli" required>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="fw-bold small text-secondary mb-1">Penerbit</label>
+                                    <input type="text" name="penerbit" class="form-control form-control-sm" placeholder="Nama penerbit">
+                                </div>
+                                <div class="col-6">
+                                    <label class="fw-bold small text-secondary mb-1">Tahun Terbit</label>
+                                    <input type="text" name="tahun_terbit" class="form-control form-control-sm" placeholder="Contoh: 2026">
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Kategori Klasifikasi *</label>
+                                <input type="text" name="kategori" class="form-control form-control-sm" placeholder="Pemrograman / Novel / Sejarah" required>
+                            </div>
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Nomor ISBN</label>
+                                <input type="text" name="isbn" class="form-control form-control-sm" placeholder="Barcode ISBN Buku">
+                            </div>
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Foto Sampul / Cover (Opsional)</label>
+                                <input type="file" name="cover_img" class="form-control form-control-sm" accept=".png, .jpg, .jpeg">
+                            </div>
+                            <div class="mb-0">
+                                <label class="fw-bold small text-secondary mb-1">Sinopsis</label>
+                                <textarea name="sinopsis" class="form-control form-control-sm" rows="2" placeholder="Ringkasan isi buku..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-success text-uppercase small mb-3 pb-1 border-bottom"><i class="bi bi-shield-lock me-1"></i> II. Logistik & Nilai Aset Internal</h6>
+                            
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">ID Unik Buku Fisik (Barcode) *</label>
+                                <input type="text" name="id_buku_fisik" class="form-control form-control-sm" placeholder="Contoh: BKS-BPS-001" required>
+                            </div>
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Nomor Panggil (Call Number)</label>
+                                <input type="text" name="nomor_panggil" class="form-control form-control-sm" placeholder="Contoh: 005.13 YUS s">
+                            </div>
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Kode / Posisi Rak Lokasi</label>
+                                <input type="text" name="lokasi_rak" class="form-control form-control-sm" placeholder="Contoh: Rak IT-02">
+                            </div>
+                            <div class="mb-2">
+                                <label class="fw-bold small text-secondary mb-1">Sumber Perolehan Buku</label>
+                                <select name="sumber_perolehan" class="form-select form-select-sm">
+                                    <option value="Pembelian">Pembelian Rutin</option>
+                                    <option value="Hadiah">Hadiah / Hibah</option>
+                                    <option value="Sumbangan">Sumbangan Siswa</option>
+                                </select>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="fw-bold small text-secondary mb-1">Harga Buku (Rp) *</label>
+                                    <input type="number" name="harga_buku" class="form-control form-control-sm" placeholder="Untuk denda Opsi A" value="0">
+                                </div>
+                                <div class="col-6">
+                                    <label class="fw-bold small text-secondary mb-1">Stok Eksemplar *</label>
+                                    <input type="number" name="stok" class="form-control form-control-sm" value="1" min="1" required>
+                                </div>
+                            </div>
+                            <div class="alert alert-warning border-0 mt-3 small py-2 mb-0">
+                                <i class="bi bi-exclamation-circle me-1"></i> <strong>Pemberitahuan:</strong> Nilai harga buku wajib diisi akurat demi kebutuhan validasi otomatis klaim ganti rugi denda **Opsi A** [Hilang/Rusak].
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-primary px-4 fw-bold shadow-sm">Simpan Data Aset</button>
+                </div>
+            </form>
         </div>
     </div>
-{% endif %}
+</div>
 {% endblock %}
