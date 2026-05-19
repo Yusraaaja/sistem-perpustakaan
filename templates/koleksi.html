@@ -9,14 +9,18 @@
     
     <div class="d-flex gap-2">
         {% if session.get('logged_in') %}
-        <button type="button" class="btn btn-primary shadow-sm fw-bold px-3 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addBookModal">
-            <i class="bi bi-journal-plus fs-5"></i> + Tambah Buku Baru
-        </button>
+            <button type="button" class="btn btn-primary shadow-sm fw-bold px-3 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addBookModal">
+                <i class="bi bi-journal-plus fs-5"></i> + Tambah Buku Baru
+            </button>
+
+            <button type="button" class="btn btn-success shadow-sm fw-bold px-3 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#importExcelModal">
+                <i class="bi bi-file-earmark-excel fs-5"></i> Import Excel
+            </button>
         {% endif %}
         
         <form action="/koleksi" method="GET" class="d-flex shadow-sm" style="width: 300px;">
             <input type="text" name="query" class="form-control form-control-sm border-end-0 rounded-start" 
-                   placeholder="Cari Judul / Barcode / Penulis..." value="{{ query or '' }}">
+                   placeholder="Cari Judul / No Registrasi / Penulis..." value="{{ query or '' }}">
             <button type="submit" class="btn btn-sm btn-dark rounded-end px-3">
                 <i class="bi bi-search"></i>
             </button>
@@ -65,7 +69,7 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th class="ps-3" style="width: 15%;">ID/Barcode</th>
+                            <th class="ps-3" style="width: 15%;">No Registrasi</th>
                             <th style="width: 40%;">Detail Informasi Buku</th>
                             <th style="width: 20%;">Kategori</th>
                             <th style="width: 15%;">Lokasi Rak</th>
@@ -79,7 +83,23 @@
                         {% if buku %}
                             {% for b in buku %}
                             <tr>
-                                <td class="ps-3 font-monospace text-muted small">{{ b.id_buku_fisik }}</td>
+                                <td class="text-center">
+                                    {% if b.id_buku_fisik %}
+                                        {# Langkah 1: Bersihkan semua simbol kurung siku dan tanda petik dari string JSON #}
+                                        {% set clean_str = b.id_buku_fisik.replace('[','').replace(']','').replace('"','').replace("'",'') %}
+                                        
+                                        {# Langkah 2: Pecah string berdasarkan koma menjadi list kembali di sisi UI #}
+                                        {% for reg_num in clean_str.split(',') %}
+                                            {% if reg_num.strip() %}
+                                                <span class="badge bg-light text-dark border font-monospace small mb-1 shadow-xs d-inline-block px-2 py-1">
+                                                    <i class="bi bi-tag-fill text-secondary me-1"></i>{{ reg_num.strip() }}
+                                                </span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <a href="/buku/{{ b.id }}" class="fw-bold text-primary text-decoration-none d-block mb-0-link">
                                         {{ b.judul }}
@@ -210,12 +230,8 @@
                             <h6 class="fw-bold text-success text-uppercase small mb-3 pb-1 border-bottom"><i class="bi bi-shield-lock me-1"></i> II. Logistik & Nilai Aset Internal</h6>
                             
                             <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">ID Unik Buku Fisik (Barcode) *</label>
+                                <label class="fw-bold small text-secondary mb-1">No Registrasi *</label>
                                 <input type="text" name="id_buku_fisik" class="form-control form-control-sm" placeholder="Contoh: BKS-BPS-001" required>
-                            </div>
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Nomor Panggil (Call Number)</label>
-                                <input type="text" name="nomor_panggil" class="form-control form-control-sm" placeholder="Contoh: 005.13 YUS s">
                             </div>
                             <div class="mb-2">
                                 <label class="fw-bold small text-secondary mb-1">Kode / Posisi Rak Lokasi</label>
@@ -240,7 +256,7 @@
                                 </div>
                             </div>
                             <div class="alert alert-warning border-0 mt-3 small py-2 mb-0">
-                                <i class="bi bi-exclamation-circle me-1"></i> <strong>Pemberitahuan:</strong> Nilai harga buku wajib diisi akurat demi kebutuhan validasi otomatis klaim ganti rugi denda **Opsi A** [Hilang/Rusak].
+                                <i class="bi bi-exclamation-circle me-1"></i> <strong>Pemberitahuan:</strong> Nilai harga buku wajib diisi akurat demi kebutuhan validasi otomatis klaim ganti rugi denda.
                             </div>
                         </div>
                     </div>
@@ -249,6 +265,44 @@
                 <div class="modal-footer bg-light py-2">
                     <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-sm btn-primary px-4 fw-bold shadow-sm">Simpan Data Aset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="importExcelModal" tabindex="-1" aria-labelledby="importExcelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3">
+            <div class="modal-header bg-success text-white py-3">
+                <h5 class="modal-title fw-bold" id="importExcelModalLabel">
+                    <i class="bi bi-file-earmark-excel-fill me-2"></i>Sinkronisasi Massal via Excel
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form action="{{ url_for('import_excel') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 small mb-3 py-2 shadow-xs">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        <strong>Aturan Format Kolom Excel:</strong><br>
+                        Wajib memiliki header persis berikut: <br>
+                        <code class="text-dark fw-bold">judul, penulis, penerbit, kategori, lokasi_rak, harga_buku, no_registrasi_list</code>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">Pilih File Spreadsheet (.xlsx / .xls) *</label>
+                        <input type="file" name="excel_file" class="form-control form-control-sm" accept=".xlsx, .xls" required>
+                    </div>
+                    
+                    <div class="bg-light p-2 rounded small text-muted border">
+                        <i class="bi bi-lightbulb text-warning me-1"></i>
+                        <strong>Tips:</strong> Pada kolom <code class="text-danger">no_registrasi_list</code> di Excel, pisahkan deretan nomor registrasi fisik buku dengan tanda koma (contoh: 00412854, 00412855). Stok aplikasi akan otomatis terhitung dari sana!
+                    </div>
+                </div>
+                
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-success px-4 fw-bold shadow-sm">Mulai Upload & Proses</button>
                 </div>
             </form>
         </div>

@@ -7,9 +7,14 @@
     </div>
     
     {% if session.get('logged_in') %}
-    <a href="/export_peminjaman" class="btn btn-success btn-sm shadow-sm">
-        <i class="bi bi-file-earmark-excel"></i> Export Laporan Excel
-    </a>
+    <div class="d-flex gap-2 align-items-center">
+        <a href="/export_peminjaman" class="btn btn-success btn-sm shadow-sm d-flex align-items-center gap-1 py-2">
+            <i class="bi bi-file-earmark-excel"></i> Export Laporan Excel
+        </a>
+        <button type="button" class="btn btn-primary btn-sm shadow-sm fw-bold px-3 d-flex align-items-center gap-2 py-2" data-bs-toggle="modal" data-bs-target="#modalTambahPinjam">
+            <i class="bi bi-bookmark-plus-fill fs-6"></i> + Catat Peminjaman Baru
+        </button>
+    </div>
     {% endif %}
 </div>
 
@@ -26,51 +31,75 @@
                 </tr>
             </thead>
             <tbody>
-                {% for p in peminjaman %}
-                <tr class="{{ 'table-danger' if p.terlambat and p.status == 'Dipinjam' else '' }}">
-                    <td class="ps-4">
-                        <small class="d-block text-dark fw-bold">Pinjam: {{ p.tgl_pinjam }}</small>
-                        <small class="d-block text-muted">Kembali: {{ p.tgl_kembali_seharusnya if p.tgl_kembali_seharusnya else '-' }}</small>
-                        {% if p.tgl_dikembalikan %}
-                            <small class="d-block text-success fw-bold">Selesai: {{ p.tgl_dikembalikan }}</small>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <strong class="text-dark">{{ p.nama }}</strong><br>
-                        <small class="text-muted">{{ p.tipe_user }} | Kelas {{ p.kelas }} - {{ p.jurusan }}</small>
-                    </td>
-                    <td><span class="fw-bold text-primary">{{ p.judul }}</span></td>
-                    <td>
-                        {% if p.status == 'Dipinjam' %}
-                            <span class="badge bg-warning text-dark px-2 py-1 rounded">Dipinjam</span>
-                            {% if p.terlambat %}
-                                <span class="badge bg-danger d-block mt-1" style="font-size: 0.65rem;">Terlambat {{ p.durasi_terlambat }} Hari</span>
-                            {% endif %}
-                        {% else %}
-                            <span class="badge bg-success px-2 py-1 rounded">{{ p.status }}</span>
-                            {% if p.denda > 0 %}
-                                <span class="badge bg-danger d-block mt-1" style="font-size: 0.65rem;">Denda: Rp {{ p.denda|int }}</span>
-                            {% endif %}
-                        {% endif %}
-                    </td>
-                    <td class="text-center pe-4">
-                        {% if p.status == 'Dipinjam' %}
-                            <form action="/kembalikan/{{ p.id }}" method="POST" class="d-flex gap-1 justify-content-center align-items-center">
-                                <select name="status_kembali" class="form-select form-select-sm" style="width: 110px;" required>
-                                    <option value="Normal">Normal</option>
-                                    <option value="Rusak">Rusak</option>
-                                    <option value="Hilang">Hilang</option>
-                                </select>
-                                <button type="submit" class="btn btn-sm btn-dark" onclick="return confirm('Proses pengembalian eksemplar?')">
-                                    Proses
-                                </button>
+                {% if session.get('logged_in') %}
+                <div class="modal fade" id="modalTambahPinjam" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalTambahPinjamLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg rounded-3">
+                            <div class="modal-header bg-dark text-white py-3">
+                                <h5 class="modal-title fw-bold id="modalTambahPinjamLabel"">
+                                    <i class="bi bi-bookmark-plus-fill text-primary me-2"></i>Ajukan Formulir Peminjaman
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            
+                            <form action="{{ url_for('proses_pinjam_admin') }}" method="POST">
+                                <div class="modal-body p-4">
+                                    <div class="row g-3">
+                                        
+                                        <div class="col-12 bg-light p-3 rounded border mb-2">
+                                            <label class="fw-bold small text-dark mb-1">Nomor Registrasi Buku *</label>
+                                            <input type="text" name="no_registrasi" class="form-control form-control-sm text-center fw-bold text-primary fs-5" 
+                                                placeholder="Contoh: 00412854" required autocomplete="off">
+                                            <small class="text-muted d-block mt-1 text-center">Ketik nomor registrasi yang tertera pada lembar fisik buku</small>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label class="fw-bold small mb-1">Nama Lengkap Peminjam *</label>
+                                            <input type="text" name="nama_peminjam" class="form-control form-control-sm shadow-xs" placeholder="Ketik nama siswa atau guru..." required>
+                                        </div>
+                                        
+                                        <div class="col-12 col-sm-6">
+                                            <label class="fw-bold small mb-1">Tipe Anggota *</label>
+                                            <select name="tipe_user" class="form-select form-select-sm" required>
+                                                <option value="Siswa">Siswa Sekolah</option>
+                                                <option value="Guru/Staff">Guru / Staff Perpustakaan</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="col-12 col-sm-6">
+                                            <label class="fw-bold small mb-1">Durasi Batas Waktu Pinjam *</label>
+                                            <select name="durasi_pinjam" class="form-select form-select-sm" required>
+                                                <option value="7">7 Hari (1 Minggu Resmi)</option>
+                                                <option value="14" selected>14 Hari (2 Minggu Maksimal)</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="col-6">
+                                            <label class="fw-bold small mb-1">Kelas *</label>
+                                            <select name="kelas" class="form-select form-select-sm" required>
+                                                <option value="-">- (Khusus Guru)</option>
+                                                <option value="X">Kelas 10 (X)</option>
+                                                <option value="XI">Kelas 11 (XI)</option>
+                                                <option value="XII">Kelas 12 (XII)</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="col-6">
+                                            <label class="fw-bold small mb-1">Jurusan / Divisi *</label>
+                                            <input type="text" name="jurusan" class="form-control form-control-sm" placeholder="Contoh: RPL" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="modal-footer bg-light py-2">
+                                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+                                    <button type="submit" class="btn btn-sm btn-primary px-4 fw-bold shadow-sm">Konfirmasi Pinjam Buku</button>
+                                </div>
                             </form>
-                        {% else %}
-                            <span class="text-muted small"><i class="bi bi-check2-circle text-success"></i> Selesai</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </tbody>
         </table>
     </div>
