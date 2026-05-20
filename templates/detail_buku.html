@@ -137,7 +137,7 @@
                         </div>
                         <div class="col-12 col-sm-6">
                             <small class="text-muted d-block">Penerbit & Tahun</small>
-                            <span class="fw-semibold text-dark">{{ buku.penerbit }} ({{ buku.tahun_terbit }})</span>
+                            <span class="fw-semibold text-dark">{{ buku.penerbit }} ({{ buku.tahun_terbit if buku.tahun_terbit else '-' }})</span>
                         </div>
                         <div class="col-12 col-sm-6">
                             <small class="text-muted d-block">Klasifikasi DDC / Kategori</small>
@@ -161,10 +161,6 @@
                                     </code>
                                 </div>
                                 <div class="col-6 col-sm-4">
-                                    <small class="text-muted d-block">Nomor Panggil</small>
-                                    <span class="text-dark fw-semibold">{{ buku.nomor_panggil if buku.nomor_panggil else '-' }}</span>
-                                </div>
-                                <div class="col-6 col-sm-4">
                                     <small class="text-muted d-block">Posisi Rak</small>
                                     <span class="badge bg-dark p-2">{{ buku.lokasi_rak if buku.lokasi_rak else '-' }}</span>
                                 </div>
@@ -179,49 +175,82 @@
 
                     <div class="card border-0 shadow-sm rounded-3 mt-4" style="background-color: #f8f9fa;">
                         <div class="card-body p-4">
-                            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-bookmark-plus-fill text-primary"></i> Ajukan Formulir Peminjaman</h5>
+                            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-bookmark-plus text-primary"></i> Sirkulasi Eksemplar Fisik</h5>
                             
-                            {% if buku.stok > 0 %}
-                            <form action="/pinjam/{{ buku.id }}" method="POST">
-                                <div class="row">
-                                    <div class="col-12 mb-3">
-                                        <label class="fw-bold small mb-1">Nama Lengkap Peminjam</label>
-                                        <input type="text" name="nama_peminjam" class="form-control form-control-sm shadow-xs" placeholder="Ketik nama Anda..." required>
-                                    </div>
-                                    <div class="col-12 col-sm-6 mb-3">
-                                        <label class="fw-bold small mb-1">Tipe Anggota</label>
-                                        <select name="tipe_user" class="form-select form-select-sm" required>
-                                            <option value="Siswa">Siswa Sekolah</option>
-                                            <option value="Guru/Staff">Guru / Staff Perpustakaan</option>
+                            {% if session.get('logged_in') %}
+                                {# --- HANYA MUNCUL JIKA ADMIN SUDAH LOGIN --- #}
+                                {% if buku.stok > 0 %}
+                                <form action="/proses_pinjam_admin" method="POST">
+                                    <input type="hidden" name="back_url" value="{{ request.path }}">
+                                    <input type="hidden" name="tipe_user" value="Siswa">
+                                    
+                                    <div class="mb-3">
+                                        <label class="fw-bold small mb-1 text-danger">Pilih Nomor Registrasi Fisik Tersedia *</label>
+                                        <select name="no_registrasi" class="form-select form-select-sm fw-bold border-danger" required>
+                                            <option value="">-- Pilih No Registrasi Buku yang Dibawa Siswa --</option>
+                                            {% if list_no_registrasi %}
+                                                {% for reg in list_no_registrasi %}
+                                                    <option value="{{ reg }}">{{ reg }} (Kondisi: {{ buku.kondisi_buku }})</option>
+                                                {% endfor %}
+                                            {% else %}
+                                                <option value="{{ buku.id_buku_fisik }}">{{ buku.id_buku_fisik }}</option>
+                                            {% endif %}
                                         </select>
+                                        <div class="form-text text-muted small" style="font-size: 11px;">
+                                            * Ambil nomor seri yang tertera pada cap/stiker fisik buku yang dibawa oleh siswa ke meja perpus.
+                                        </div>
                                     </div>
-                                    <div class="col-12 col-sm-6 mb-3">
-                                        <label class="fw-bold small mb-1">Durasi Batas Waktu Pinjam</label>
-                                        <select name="durasi_pinjam" class="form-select form-select-sm" required>
-                                            <option value="7">7 Hari (1 Minggu Resmi)</option>
-                                            <option value="14" selected>14 Hari (2 Minggu Maksimal)</option>
-                                        </select>
+
+                                    <div class="row">
+                                        <div class="col-md-7 mb-3">
+                                            <label class="fw-bold small mb-1">Nama Lengkap Siswa / Peminjam *</label>
+                                            <input type="text" name="id_anggota" class="form-control form-control-sm" placeholder="Ketik nama siswa..." required>
+                                        </div>
+                                        
+                                        <div class="col-md-5 mb-3">
+                                            <label class="fw-bold small mb-1 text-primary">Durasi Pinjam *</label>
+                                            <select name="durasi_pinjam" class="form-select form-select-sm fw-bold border-primary" required>
+                                                <option value="1">1 Hari (Kilat)</option>
+                                                <option value="3">3 Hari</option>
+                                                <option value="7" selected>7 Hari (Normal)</option>
+                                                <option value="14">14 Hari</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div class="col-6 mb-3">
-                                        <label class="fw-bold small mb-1">Kelas</label>
-                                        <select name="kelas" class="form-select form-select-sm" required>
-                                            <option value="-">- (Khusus Guru)</option>
-                                            <option value="X">Kelas 10 (X)</option>
-                                            <option value="XI">Kelas 11 (XI)</option>
-                                            <option value="XII">Kelas 12 (XII)</option>
-                                        </select>
+
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            <label class="fw-bold small mb-1">Kelas *</label>
+                                            <select name="kelas" class="form-select form-select-sm" required>
+                                                <option value="">-- Pilih --</option>
+                                                <option value="X">Kelas 10 (X)</option>
+                                                <option value="XI">Kelas 11 (XI)</option>
+                                                <option value="XII">Kelas 12 (XII)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            <label class="fw-bold small mb-1">Jurusan / Divisi *</label>
+                                            <input type="text" name="jurusan" class="form-control form-control-sm" placeholder="Contoh: RPL" required>
+                                        </div>
                                     </div>
-                                    <div class="col-6 mb-3">
-                                        <label class="fw-bold small mb-1">Jurusan / Divisi</label>
-                                        <input type="text" name="jurusan" class="form-control form-control-sm" placeholder="Contoh: RPL" required>
-                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold mt-2 shadow-sm">Konfirmasi Pinjam Buku Sekarang</button>
+                                </form>
+                                {% else %}
+                                <div class="alert alert-danger mb-0 border-0 shadow-xs">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> <strong>Mohon Maaf:</strong> Seluruh eksemplar fisik buku ini sedang dipinjam atau dalam kondisi perbaikan.
                                 </div>
-                                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold mt-2 shadow-sm">Konfirmasi Pinjam Buku Sekarang</button>
-                            </form>
+                                {% endif %}
+                                
                             {% else %}
-                            <div class="alert alert-danger mb-0 border-0 shadow-xs">
-                                <i class="bi bi-exclamation-triangle-fill"></i> <strong>Mohon Maaf:</strong> Seluruh eksemplar fisik buku ini sedang dipinjam atau dalam kondisi perbaikan.
-                            </div>
+                                {# --- TAMPILAN UNTUK USER BIASA / SISWA YANG LIHAT KATALOG --- #}
+                                <div class="alert alert-info border-0 shadow-sm small mb-0">
+                                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-info-circle-fill text-primary me-1"></i> Cara Meminjam Buku Fisik:</h6>
+                                    <p class="text-muted mb-2" style="font-size: 12px; line-height: 1.5;">
+                                        Silakan ambil buku fisik ini di rak kode <strong>{{ buku.lokasi_rak if buku.lokasi_rak else 'Tidak Diketahui' }}</strong>, kemudian bawa buku ke meja pelayanan pustakawan untuk dicatat oleh petugas menggunakan sistem perpustakaan.
+                                    </p>
+                                    <span class="badge bg-secondary w-100 py-2">Stok Tersedia di Rak: {{ buku.stok }} Eksemplar</span>
+                                </div>
                             {% endif %}
                         </div>
                     </div>

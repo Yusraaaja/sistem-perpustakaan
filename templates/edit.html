@@ -16,26 +16,17 @@
                 <input type="hidden" name="back_url" value="{{ back_url }}">
                 
                 <h6 class="fw-bold text-primary text-uppercase small mb-3 border-bottom pb-2">I. Informasi Katalog Buku</h6>
-                
                 <div class="row">
-                    <div class="col-12 mb-3">
+                    <div class="col-md-12 mb-3">
                         <label class="fw-bold small mb-1">Judul Utama Buku</label>
                         <input type="text" name="judul" class="form-control form-control-sm" value="{{ buku.judul }}" required>
                     </div>
-                    <div class="col-12 mb-3">
-                        <label class="fw-bold small mb-1">Sub Judul / Keterangan Tambahan</label>
-                        <input type="text" name="sub_judul" class="form-control form-control-sm" value="{{ buku.sub_judul if buku.sub_judul else '' }}" placeholder="Contoh: Edisi Revisi / Terjemahan Resmi">
-                    </div>
                     <div class="col-md-6 mb-3">
                         <label class="fw-bold small mb-1">Nama Penulis / Pengarang</label>
-                        <input type="text" name="penulis" class="form-control form-control-sm" value="{{ buku.penulis }}" required>
+                        <input type="text" name="penulis" class="form-control form-control-sm" value="{{ buku.penulis if buku.penulis else '' }}">
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="fw-bold small mb-1">Kategori / Klasifikasi</label>
-                        <input type="text" name="kategori" class="form-control form-control-sm" value="{{ buku.kategori }}" required>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="fw-bold small mb-1">Nama Penerbit</label>
+                        <label class="fw-bold small mb-1">Penerbit</label>
                         <input type="text" name="penerbit" class="form-control form-control-sm" value="{{ buku.penerbit if buku.penerbit else '' }}">
                     </div>
                     <div class="col-md-4 mb-3">
@@ -43,11 +34,15 @@
                         <input type="text" name="tahun_terbit" class="form-control form-control-sm" value="{{ buku.tahun_terbit if buku.tahun_terbit else '' }}">
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label class="fw-bold small mb-1">Nomor Standar ISBN</label>
+                        <label class="fw-bold small mb-1">Nomor ISBN</label>
                         <input type="text" name="isbn" class="form-control form-control-sm" value="{{ buku.isbn if buku.isbn else '' }}">
                     </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small mb-1">Kategori Buku</label>
+                        <input type="text" name="kategori" class="form-control form-control-sm" value="{{ buku.kategori if buku.kategori else '' }}">
+                    </div>
                     <div class="col-12 mb-3">
-                        <label class="fw-bold small mb-1">Sinopsis Ringkas Buku</label>
+                        <label class="fw-bold small mb-1">Sinopsis Ringkas</label>
                         <textarea name="sinopsis" class="form-control form-control-sm" rows="3">{{ buku.sinopsis if buku.sinopsis else '' }}</textarea>
                     </div>
                 </div>
@@ -58,7 +53,7 @@
                     <div class="col-md-6 mb-3">
                         <label class="fw-bold small mb-1">No Registrasi</label>
                         <input type="text" name="id_buku_fisik" class="form-control form-control-sm bg-light" value="{{ buku.id_buku_fisik }}" readonly>
-                        <small class="text-danger" style="font-size: 0.75rem;">* Kode barcode fisik bersifat permanen & tidak dapat diubah.</small>
+                        <small class="text-danger" style="font-size: 0.75rem;">* No Registrasi bersifat permanen & tidak dapat diubah.</small>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="fw-bold small mb-1">Kondisi Fisik Eksemplar</label>
@@ -78,7 +73,8 @@
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="fw-bold small mb-1">Jumlah Stok Fisik</label>
-                        <input type="number" name="stok" class="form-control form-control-sm" value="{{ buku.stok }}" required>
+                        <input type="number" name="stok" class="form-control form-control-sm" value="{{ buku.stok }}" readonly>
+                        <small class="text-danger" style="font-size: 0.75rem;">* Jumlah Stok bersifat permanen & tidak dapat diubah karena sinkron dengan jumlah <strong>No Registrasi</strong>.</small>
                     </div>
                 </div>
 

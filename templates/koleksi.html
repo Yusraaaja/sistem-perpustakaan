@@ -44,7 +44,7 @@
     <div class="col-md-3">
         <div class="card border-0 shadow-sm bg-warning text-dark p-3 rounded-3">
             <small class="text-dark-50 fw-bold text-uppercase">Sedang Dipinjam</small>
-            <h3 class="fw-bold mb-0 mt-1">{{ total_dipinjam }} <span class="fs-6 fw-normal">Siswa</span></h3>
+            <h3 class="fw-bold mb-0 mt-1">{{ total_dipinjam }} <span class="fs-6 fw-normal">Buku</span></h3>
         </div>
     </div>
     <div class="col-md-3">
@@ -115,9 +115,10 @@
                                 <td class="small fw-semibold text-secondary"><i class="bi bi-box-seam me-1"></i>{{ b.lokasi_rak or 'Belum Diatur' }}</td>
                                 <td class="text-center">
                                     <span class="badge {{ 'bg-success' if b.stok > 0 else 'bg-danger' }} rounded-2 px-2 py-1">
-                                        {{ b.stok }} Eks
+                                        {{ b.stok }} Eksemplar
                                     </span>
                                 </td>
+
                                 {% if session.get('logged_in') %}
                                 <td class="text-center pe-3">
                                     <div class="btn-group btn-group-sm shadow-sm">
@@ -251,8 +252,8 @@
                                     <input type="number" name="harga_buku" class="form-control form-control-sm" placeholder="Untuk denda Opsi A" value="0">
                                 </div>
                                 <div class="col-6">
-                                    <label class="fw-bold small text-secondary mb-1">Stok Eksemplar *</label>
-                                    <input type="number" name="stok" class="form-control form-control-sm" value="1" min="1" required>
+                                    <label class="fw-bold small text-secondary mb-1">Stok (Otomatis) *</label>
+                                    <input type="number" name="stok" class="form-control form-control-sm bg-light fw-bold" value="1" readonly required>
                                 </div>
                             </div>
                             <div class="alert alert-warning border-0 mt-3 small py-2 mb-0">
@@ -282,11 +283,10 @@
             
             <form action="{{ url_for('import_excel') }}" method="POST" enctype="multipart/form-data">
                 <div class="modal-body p-4">
-                    <div class="alert alert-info border-0 small mb-3 py-2 shadow-xs">
-                        <i class="bi bi-info-circle-fill me-2"></i>
-                        <strong>Aturan Format Kolom Excel:</strong><br>
+                    <div class="alert alert-info py-2 small border-0 shadow-xs mb-3">
+                        <i class="bi bi-info-circle-fill me-1"></i> Aturan Struktur Kolom Berdasarkan Dokumen Patokan:<br>
                         Wajib memiliki header persis berikut: <br>
-                        <code class="text-dark fw-bold">judul, penulis, penerbit, kategori, lokasi_rak, harga_buku, no_registrasi_list</code>
+                        <code class="text-dark fw-bold">judul, penulis, penerbit, tahun_terbit, isbn, kategori, sinopsis, lokasi_rak, sumber_perolehan, tanggal_masuk, kondisi_buku, harga_buku, no_registrasi_list</code>
                     </div>
                     
                     <div class="mb-3">
@@ -308,4 +308,14 @@
         </div>
     </div>
 </div>
+<script>
+document.querySelector('input[name="id_buku_fisik"]').addEventListener('input', function() {
+    let nilaiInput = this.value;
+    // Pecah string berdasarkan koma dan saring yang tidak kosong
+    let jumlahBuku = nilaiInput.split(',').map(item => item.strip ? item.strip() : item.trim()).filter(item => item !== "").length;
+    
+    // Update nilai input stok di layar, minimal tetap 1 jika kosong
+    document.querySelector('input[name="stok"]').value = jumlahBuku > 0 ? jumlahBuku : 1;
+});
+</script>
 {% endblock %}
