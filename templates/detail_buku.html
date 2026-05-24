@@ -163,7 +163,11 @@
                                     <label class="text-muted d-block small">Lokasi Rak & Riwayat</label>
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="badge bg-dark px-3 py-2 fs-7"><i class="bi bi-geo-alt-fill text-warning me-1"></i> {{ buku.lokasi_rak }}</span>
-                                        <button type="button" class="btn btn-sm btn-outline-primary px-3 fw-bold" onclick="bukaPopupRiwayat Buku({{ buku.id }}, '{{ buku.judul }}')">
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary px-3 fw-bold" 
+                                                data-id="{{ buku.id }}" 
+                                                data-judul="{{ buku.judul }}" 
+                                                onclick="bukaPopupRiwayatBuku(this)">
                                             <i class="bi bi-clock-history"></i> Riwayat Buku
                                         </button>
                                     </div>
@@ -296,7 +300,10 @@
 </div>
 
 <script>
-function bukaPopupRiwayatBuku(bukuId, judulBuku) {
+function bukaPopupRiwayatBuku(element) {
+    const bukuId = element.getAttribute('data-id');
+    const judulBuku = element.getAttribute('data-judul');
+
     document.getElementById('judulModalRiwayat').innerHTML = `<i class="bi bi-clock-history me-2"></i> Riwayat: ${judulBuku}`;
     const tbody = document.getElementById('tabelBodyRiwayat');
     const loader = document.getElementById('loadingRiwayat');
