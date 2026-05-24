@@ -1,4 +1,5 @@
 {% extends 'layout.html' %}
+{% block content %}
 {# --- TAMBAHKAN CSS KUSTOM DI SINI --- #}
 <style>
     /* Container untuk efek hover */
@@ -42,61 +43,11 @@
         opacity: 1;
     }
 </style>
-<script>
-function bukaPopupRiwayatBuku(bukuId, judulBuku) {
-    document.getElementById('judulModalRiwayat').innerHTML = `<i class="bi bi-clock-history me-2"></i> Riwayat: ${judulBuku}`;
-    const tbody = document.getElementById('tabelBodyRiwayat');
-    const loader = document.getElementById('loadingRiwayat');
-    
-    tbody.innerHTML = '';
-    loader.style.display = 'block';
-    
-    var myModal = new bootstrap.Modal(document.getElementById('modalRiwayatBuku'));
-    myModal.show();
-    
-    fetch(`/api/riwayat_buku/${bukuId}`)
-        .then(response => response.json())
-        .then(data => {
-            loader.style.display = 'none';
-            if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-muted">Belum ada rekam jejak sirkulasi untuk eksemplar buku ini.</td></tr>`;
-                return;
-            }
-            data.forEach(p => {
-                let badgeStatus = '';
-                if(p.status === 'Dipinjam') badgeStatus = `<span class="badge bg-warning text-dark">Dipinjam</span>`;
-                else if(p.status === 'Selesai') badgeStatus = `<span class="badge bg-success">Selesai</span>`;
-                else if(p.status === 'Rusak') badgeStatus = `<span class="badge bg-danger">Rusak</span>`;
-                else if(p.status === 'Hilang') badgeStatus = `<span class="badge bg-secondary">Hilang</span>`;
-                else if(p.status === 'Dibayar/Lunas') badgeStatus = `<span class="badge bg-info text-dark">Dibayar/Lunas</span>`;
-                
-                let tglKembali = p.tgl_dikembalikan ? p.tgl_dikembalikan : '-';
-                let dendaUang = parseInt(p.denda) > 0 ? `Rp ${p.denda.toLocaleString('id-ID')}` : 'Rp 0';
-                
-                tbody.innerHTML += `
-                    <tr>
-                        <td class="fw-bold text-dark">${p.id_anggota}</td>
-                        <td>${p.kelas} / ${p.jurusan}</td>
-                        <td>${p.tgl_pinjam}</td>
-                        <td>${tglKembali}</td>
-                        <td>${badgeStatus}</td>
-                        <td class="text-danger fw-bold">${dendaUang}</td>
-                    </tr>
-                `;
-            });
-        })
-        .catch(err => {
-            loader.style.display = 'none';
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-danger">Gagal menarik data histori sirkulasi server.</td></tr>`;
-        });
-}
-</script>
-{% block content %}
 <div class="row justify-content-center mt-4">
     <div class="col-md-9">
         
         <div class="mb-4 d-flex justify-content-between align-items-center">
-            <a href="{{ '/koleksi' }}" class="btn btn-outline-secondary btn-sm shadow-sm">
+            <a href="{{ url_for('koleksi') }}" class="btn btn-outline-secondary btn-sm shadow-sm">
                 <i class="bi bi-arrow-left-circle"></i> Kembali ke Halaman Sebelumnya
             </a>
             {% if session.get('logged_in') %}
@@ -343,4 +294,54 @@ function bukaPopupRiwayatBuku(bukuId, judulBuku) {
         </div>
     </div>
 </div>
+
+<script>
+function bukaPopupRiwayatBuku(bukuId, judulBuku) {
+    document.getElementById('judulModalRiwayat').innerHTML = `<i class="bi bi-clock-history me-2"></i> Riwayat: ${judulBuku}`;
+    const tbody = document.getElementById('tabelBodyRiwayat');
+    const loader = document.getElementById('loadingRiwayat');
+    
+    tbody.innerHTML = '';
+    loader.style.display = 'block';
+    
+    var myModal = new bootstrap.Modal(document.getElementById('modalRiwayatBuku'));
+    myModal.show();
+    
+    fetch(`/api/riwayat_buku/${bukuId}`)
+        .then(response => response.json())
+        .then(data => {
+            loader.style.display = 'none';
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-muted">Belum ada rekam jejak sirkulasi untuk eksemplar buku ini.</td></tr>`;
+                return;
+            }
+            data.forEach(p => {
+                let badgeStatus = '';
+                if(p.status === 'Dipinjam') badgeStatus = `<span class="badge bg-warning text-dark">Dipinjam</span>`;
+                else if(p.status === 'Selesai') badgeStatus = `<span class="badge bg-success">Selesai</span>`;
+                else if(p.status === 'Rusak') badgeStatus = `<span class="badge bg-danger">Rusak</span>`;
+                else if(p.status === 'Hilang') badgeStatus = `<span class="badge bg-secondary">Hilang</span>`;
+                else if(p.status === 'Dibayar/Lunas') badgeStatus = `<span class="badge bg-info text-dark">Dibayar/Lunas</span>`;
+                
+                let tglKembali = p.tgl_dikembalikan ? p.tgl_dikembalikan : '-';
+                let dendaUang = parseInt(p.denda) > 0 ? `Rp ${p.denda.toLocaleString('id-ID')}` : 'Rp 0';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold text-dark">${p.id_anggota}</td>
+                        <td>${p.kelas} / ${p.jurusan}</td>
+                        <td>${p.tgl_pinjam}</td>
+                        <td>${tglKembali}</td>
+                        <td>${badgeStatus}</td>
+                        <td class="text-danger fw-bold">${dendaUang}</td>
+                    </tr>
+                `;
+            });
+        })
+        .catch(err => {
+            loader.style.display = 'none';
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-danger">Gagal menarik data histori sirkulasi server.</td></tr>`;
+        });
+}
+</script>
 {% endblock %}
