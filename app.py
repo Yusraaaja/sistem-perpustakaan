@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import sqlite3
 from datetime import datetime, timedelta
 import os
@@ -65,14 +65,9 @@ def index():
     return render_template('index.html')
 
 @app.route('/search')
-def cari_buku():
-    query = request.args.get('query')
-    results = []
-    if query:
-        conn = get_db_connection()
-        results = conn.execute('SELECT * FROM buku WHERE judul LIKE ?', ('%' + query + '%',)).fetchall()
-        conn.close()
-    return render_template('index.html', query=query, results=results)
+def search_redirect():
+    query = request.args.get('query', '').strip()
+    return redirect(url_for('koleksi_lengkap', query=query))
 
 @app.route('/add', methods=['GET', 'POST'])
 def tambah_buku():
@@ -265,6 +260,25 @@ def detail_buku(id):
                            list_no_registrasi=list_no_registrasi, 
                            back_url=back_url)
 
+@app.route('/reset_katalog_buku', methods=['POST'])
+def reset_katalog_buku():
+    if not session.get('logged_in'):
+        flash('Akses ditolak!', 'danger')
+        return redirect(url_for('login'))
+        
+    conn = get_db_connection()
+    try:
+        conn.execute('DELETE FROM buku')
+        # Reset juga auto increment ID agar bersih dari nol lagi
+        conn.execute("DELETE FROM sqlite_sequence WHERE name='buku'")
+        conn.commit()
+        flash('Seluruh database katalog buku berhasil dikosongkan! Silakan masukkan data baru via Import Excel.', 'success')
+    except sqlite3.Error as e:
+        conn.rollback()
+        flash(f'Gagal mengosongkan database: {str(e)}', 'danger')
+    conn.close()
+    return redirect(url_for('koleksi_lengkap'))
+
 # Rute Upload Gambar
 @app.route('/buku/<int:id>/upload_cover', methods=['POST'])
 def upload_cover(id):
@@ -350,46 +364,38 @@ def daftar_peminjaman():
 
 @app.route('/proses_pinjam_admin', methods=['POST'])
 def proses_pinjam_admin():
-    # PROTEKSI UTAMA: Menolak segala jenis request peminjaman jika belum login admin
     if not session.get('logged_in'):
-        flash('Akses ditolak! Anda harus login sebagai admin untuk memproses peminjaman.', 'danger')
+        flash('Akses ditolak!', 'danger')
         return redirect(url_for('login'))
         
-    # Ambil data dari form (Sudah disinkronkan dengan name="id_anggota" dan durasi_pinjam)
     no_registrasi_input = request.form.get('no_registrasi', '').strip()
-    id_anggota = request.form.get('id_anggota', '').strip()  # Menggantikan nama_peminjam
+    id_anggota = request.form.get('id_anggota', '').strip()
     kelas = request.form.get('kelas', '-')
     jurusan = request.form.get('jurusan', '-')
     tipe_user = request.form.get('tipe_user', 'Siswa')
     
-    # Tangkap nilai durasi pinjam dari form, jika tidak ada/kosong default ke 7 hari
     try:
         durasi_pinjam = int(request.form.get('durasi_pinjam', 7))
-    except (ValueError, TypeError):
+    except:
         durasi_pinjam = 7
     
-    # Deteksi asal halaman untuk redirect balik (agar fleksibel jika diakses dari detail_buku)
     back_url = request.form.get('back_url', '').strip()
     default_redirect = back_url if back_url else url_for('daftar_peminjaman')
     
-    # Validasi input wajib
     if not no_registrasi_input or not id_anggota:
-        flash('Nama peminjam/Anggota dan Nomor Registrasi wajib diisi!', 'danger')
+        flash('Data input wajib diisi!', 'danger')
         return redirect(default_redirect)
     
     conn = get_db_connection()
     conn.row_factory = sqlite3.Row
     
-    # Ambil data buku untuk validasi nomor registrasi
     semua_buku = conn.execute('SELECT * FROM buku WHERE stok > 0').fetchall()
-    
     buku_ditemukan = None
     list_reg_terupdate = []
     
     for b in semua_buku:
         if b['id_buku_fisik']:
             raw_reg = str(b['id_buku_fisik']).strip()
-            
             try:
                 if raw_reg.startswith('['):
                     list_reg = json.loads(raw_reg)
@@ -400,25 +406,23 @@ def proses_pinjam_admin():
                 
                 if no_registrasi_input in list_reg:
                     buku_ditemukan = b
-                    list_reg.remove(no_registrasi_input) # Keluarkan nomor registrasi dari rak
+                    list_reg.remove(no_registrasi_input)
                     list_reg_terupdate = list_reg
                     break
-            except Exception:
+            except:
                 continue
                 
     if buku_ditemukan:
         tgl_sekarang = datetime.now()
         tgl_pinjam_str = tgl_sekarang.strftime('%Y-%m-%d')
-        
-        # OPTIMASI: Menghitung tanggal kembali secara dinamis berdasarkan input durasi_pinjam
         tgl_kembali_str = (tgl_sekarang + timedelta(days=durasi_pinjam)).strftime('%Y-%m-%d')
         
         try:
-            # Update stok berkurang 1 dan perbarui nomor registrasi di rak
-            conn.execute('UPDATE buku SET stok = stok - 1, id_buku_fisik = ? WHERE id = ?', 
-                         (json.dumps(list_reg_terupdate), buku_ditemukan['id']))
+            # SINKRONISASI STOK: Jika list_reg_terupdate kosong, otomatis stok jadikan 0 secara paksa!
+            stok_baru = len(list_reg_terupdate)
+            conn.execute('UPDATE buku SET stok = ?, id_buku_fisik = ? WHERE id = ?', 
+                         (stok_baru, json.dumps(list_reg_terupdate), buku_ditemukan['id']))
             
-            # Format pelacakan nomor registrasi fisik agar tersimpan aman di kolom jurusan
             info_jurusan_reg = f"{jurusan} | Reg: {no_registrasi_input}"
             
             conn.execute('''
@@ -427,12 +431,12 @@ def proses_pinjam_admin():
             ''', (buku_ditemukan['id'], id_anggota, tipe_user, kelas, info_jurusan_reg, tgl_pinjam_str, tgl_kembali_str))
             
             conn.commit()
-            flash(f'Berhasil! Buku "{buku_ditemukan["judul"]}" (Reg: {no_registrasi_input}) berhasil dipinjam oleh {id_anggota} selama {durasi_pinjam} hari.', 'success')
+            flash(f'Berhasil dipinjam!', 'success')
         except sqlite3.Error as e:
             conn.rollback()
-            flash(f'Gagal memperbarui database: {str(e)}', 'danger')
+            flash(f'Gagal: {str(e)}', 'danger')
     else:
-        flash(f'Nomor Registrasi "{no_registrasi_input}" tidak ditemukan atau stok buku di rak sedang kosong!', 'danger')
+        flash('Nomor Registrasi tidak tersedia!', 'danger')
         
     conn.close()
     return redirect(default_redirect)
@@ -440,7 +444,7 @@ def proses_pinjam_admin():
 @app.route('/kembalikan/<int:pinjam_id>', methods=['POST'])
 def proses_kembalikan(pinjam_id):
     if not session.get('logged_in'):
-        flash('Akses ditolak! Anda harus login sebagai admin.', 'danger')
+        flash('Akses ditolak!', 'danger')
         return redirect(url_for('login'))
 
     status_kembali = request.form.get('status_kembali')  # 'Normal', 'Rusak', 'Hilang'
@@ -458,7 +462,6 @@ def proses_kembalikan(pinjam_id):
     ''', (pinjam_id,)).fetchone()
     
     if pinjaman:
-        # 1. Hitung denda keterlambatan (Rp 1.000 / hari)
         denda_keterlambatan = 0
         if pinjaman['tgl_kembali_seharusnya']:
             tgl_seharusnya = datetime.strptime(pinjaman['tgl_kembali_seharusnya'], '%Y-%m-%d')
@@ -466,45 +469,39 @@ def proses_kembalikan(pinjam_id):
             if hari_terlambat > 0:
                 denda_keterlambatan = hari_terlambat * 1000
             
-        # 2. Logika Aturan Denda Berdasarkan Kondisi Buku
         denda_kondisi = 0
         harga_buku_asli = pinjaman['harga_buku'] if pinjaman['harga_buku'] else 0
         
-        if status_kembali in ['Rusak', 'Hilang']:
-            denda_kondisi = harga_buku_asli  
-            conn.execute('UPDATE buku SET kondisi_buku = ? WHERE id = ?', (status_kembali, pinjaman['buku_id']))
-        else:
-            # PENGEMBALIAN NORMAL: Kembalikan nomor registrasi fisik ke rak buku asal
-            no_reg_kembali = None
-            raw_jurusan = pinjaman['jurusan'] if pinjaman['jurusan'] else ''
-            
-            # Ekstrak No Registrasi dari format "RPL | Reg: 412855"
-            if "| Reg:" in raw_jurusan:
-                try:
-                    no_reg_kembali = raw_jurusan.split("| Reg:")[-1].strip()
-                except Exception:
-                    no_reg_kembali = None
+        # Ekstrak No Registrasi
+        no_reg_kembali = None
+        raw_jurusan = pinjaman['jurusan'] if pinjaman['jurusan'] else ''
+        if "| Reg:" in raw_jurusan:
+            try:
+                no_reg_kembali = raw_jurusan.split("| Reg:")[-1].strip()
+            except:
+                no_reg_kembali = None
 
-            # Ambil list nomor registrasi yang ada saat ini di database buku
+        if status_kembali in ['Rusak', 'Hilang']:
+            denda_kondisi = harga_buku_asli
+            # BUG FIX: JANGAN update status tabel buku global menjadi 'Hilang/Rusak' agar buku aman lain tidak tertular!
+            # Biarkan kondisi buku utama tetap 'Baik', pelacakan kondisi rusak/hilang dibaca lewat histori transaksi.
+            status_final = status_kembali  # Status peminjaman menjadi 'Rusak' atau 'Hilang'
+        else:
+            # PENGEMBALIAN NORMAL: Masukkan kembali nomor seri ke rak buku asal
+            status_final = "Selesai"
             raw_buku_reg = pinjaman['id_buku_fisik'] if pinjaman['id_buku_fisik'] else '[]'
             try:
-                if raw_buku_reg.startswith('['):
-                    current_regs = json.loads(raw_buku_reg)
-                else:
-                    current_regs = [r.strip() for r in raw_buku_reg.split(',') if r.strip()]
-            except Exception:
+                current_regs = json.loads(raw_buku_reg) if raw_buku_reg.startswith('[') else [r.strip() for r in raw_buku_reg.split(',') if r.strip()]
+            except:
                 current_regs = []
 
-            # Masukkan kembali nomor registrasi tersebut jika berhasil diekstrak
             if no_reg_kembali and no_reg_kembali not in current_regs:
                 current_regs.append(no_reg_kembali)
 
-            # Update stok bertambah 1 beserta array nomor registrasi fisiknya yang baru
-            conn.execute('UPDATE buku SET stok = stok + 1, id_buku_fisik = ? WHERE id = ?', 
-                         (json.dumps(current_regs), pinjaman['buku_id']))
+            conn.execute('UPDATE buku SET stok = ?, id_buku_fisik = ? WHERE id = ?', 
+                         (len(current_regs), json.dumps(current_regs), pinjaman['buku_id']))
             
         total_denda = denda_keterlambatan + denda_kondisi
-        status_final = f"Selesai ({status_kembali})"
         
         try:
             conn.execute('''
@@ -513,41 +510,74 @@ def proses_kembalikan(pinjam_id):
                 WHERE id = ?
             ''', (tgl_sekarang_str, status_final, total_denda, pinjam_id))
             conn.commit()
-            
-            flash(f'Buku berhasil diproses! Status Fisik: {status_kembali}. Total Denda: Rp {total_denda:,}', 'success')
+            flash(f'Berhasil memproses pengembalian ({status_kembali})!', 'success')
         except sqlite3.Error as e:
             conn.rollback()
-            flash(f'Gagal memperbarui database transaksi: {str(e)}', 'danger')
-    else:
-        flash('Data transaksi peminjaman tidak ditemukan!', 'danger')
-    
+            flash(f'Gagal: {str(e)}', 'danger')
     conn.close()
     return redirect(url_for('daftar_peminjaman'))
 
+@app.route('/lunasi_denda/<int:pinjam_id>', methods=['POST'])
+def lunasi_denda(pinjam_id):
+    if not session.get('logged_in'):
+        flash('Akses ditolak!', 'danger')
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    try:
+        conn.execute("UPDATE peminjaman SET status = 'Dibayar/Lunas', denda = 0 WHERE id = ?", (pinjam_id,))
+        conn.commit()
+        flash('Status sirkulasi berhasil diperbarui menjadi Dibayar/Lunas!', 'success')
+    except sqlite3.Error as e:
+        conn.rollback()
+        flash(f'Gagal memperbarui data: {str(e)}', 'danger')
+    conn.close()
+    return redirect(url_for('daftar_peminjaman'))
+
+@app.route('/api/riwayat_buku/<int:buku_id>')
+def api_riwayat_buku(buku_id):
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    riwayat = conn.execute('''
+        SELECT id_anggota, kelas, jurusan, tgl_pinjam, tgl_dikembalikan, status, denda 
+        FROM peminjaman 
+        WHERE id_buku = ? 
+        ORDER BY id DESC
+    ''', (buku_id,)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(row) for row in riwayat])
+
 @app.route('/koleksi')
 def koleksi_lengkap():
-    # Fitur ini sengaja dibuka untuk umum agar siswa bisa melihat katalog
     conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
     
-    # Menangani input dari form pencarian (Gabungan dengan fungsi search_database lama)
     query = request.args.get('query', '').strip()
     if query:
-        # Jika ada pencarian, filter datanya
         buku = conn.execute('''
             SELECT * FROM buku 
             WHERE judul LIKE ? OR penulis LIKE ? OR id_buku_fisik LIKE ?
             ORDER BY id DESC
         ''', (f'%{query}%', f'%{query}%', f'%{query}%')).fetchall()
     else:
-        # Jika tidak ada pencarian, tampilkan semua
         buku = conn.execute('SELECT * FROM buku ORDER BY id DESC').fetchall()
     
-    # 1. Statistik Dasar & Riil
-    total_buku = conn.execute('SELECT SUM(stok) FROM buku').fetchone()[0] or 0
+    # Perbaikan Stok Riil: Hitung total stok dari buku yang id_buku_fisik-nya tidak kosong/habis
+    total_buku = 0
+    for b in buku:
+        if b['id_buku_fisik']:
+            try:
+                regs = json.loads(b['id_buku_fisik']) if b['id_buku_fisik'].startswith('[') else [r.strip() for r in b['id_buku_fisik'].split(',') if r.strip()]
+                total_buku += len(regs)
+            except:
+                total_buku += b['stok']
+        else:
+            total_buku += 0
+
     total_judul = conn.execute('SELECT COUNT(*) FROM buku').fetchone()[0] or 0
     total_dipinjam = conn.execute('SELECT COUNT(*) FROM peminjaman WHERE status = "Dipinjam"').fetchone()[0] or 0
 
-    # 2. Data Buku Populer (Paling sering dipinjam)
     buku_populer = conn.execute('''
         SELECT b.judul, b.kategori, COUNT(p.id) as total_dipinjam
         FROM buku b
@@ -558,8 +588,6 @@ def koleksi_lengkap():
     ''').fetchall()
     
     conn.close()
-    
-    # Mengirim semua variabel dengan nama yang tepat ke koleksi.html
     return render_template('koleksi.html', 
                            buku=buku, 
                            query=query,
@@ -567,8 +595,6 @@ def koleksi_lengkap():
                            total_judul=total_judul,
                            total_dipinjam=total_dipinjam,
                            buku_populer=buku_populer)
-
-import pandas as pd # Tambahkan import ini di bagian atas app.py
 
 @app.route('/export_peminjaman')
 def export_peminjaman():
@@ -684,7 +710,6 @@ def import_excel():
                 stok = len(cleaned_regs) if cleaned_regs else 1
                 
                 try:
-                    # SINKRONISASI 14 KOLOM UTAMA DATABASE
                     cursor.execute('''
                         INSERT INTO buku (judul, penulis, penerbit, tahun_terbit, isbn, kategori, sinopsis, lokasi_rak, sumber_perolehan, tanggal_masuk, kondisi_buku, harga_buku, id_buku_fisik, stok)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -776,4 +801,4 @@ def init_db():
 
 if __name__ == '__main__':
     init_db() 
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

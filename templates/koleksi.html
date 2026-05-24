@@ -16,6 +16,11 @@
             <button type="button" class="btn btn-success shadow-sm fw-bold px-3 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#importExcelModal">
                 <i class="bi bi-file-earmark-excel fs-5"></i> Import Excel
             </button>
+            <form action="/reset_katalog_buku" method="POST" onsubmit="return konfirmasiHapusDatabase(event);" class="d-inline">
+                <button type="submit" class="btn btn-danger btn-sm shadow-sm fw-bold px-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-trash3-fill"></i> Kosongkan Katalog Buku
+                </button>
+            </form>
         {% endif %}
         
         <form action="/koleksi" method="GET" class="d-flex shadow-sm" style="width: 300px;">
@@ -317,5 +322,18 @@ document.querySelector('input[name="id_buku_fisik"]').addEventListener('input', 
     // Update nilai input stok di layar, minimal tetap 1 jika kosong
     document.querySelector('input[name="stok"]').value = jumlahBuku > 0 ? jumlahBuku : 1;
 });
+
+function konfirmasiHapusDatabase(event) {
+    event.preventDefault();
+    const form = event.target;
+    
+    let cek1 = confirm("PERINGATAN KRITIS:\nTindakan ini akan menghapus SELURUH DATA KATALOG BUKU dari sistem secara permanen.\n\nApakah Anda yakin?");
+    if(cek1) {
+        let cek2 = confirm("KONFIRMASI AKHIR:\nData yang sudah dihapus tidak dapat dikembalikan kecuali Anda melakukan Import ulang berkas Excel baru.\n\nLanjutkan eksekusi pengosongan database?");
+        if(cek2) {
+            form.submit();
+        }
+    }
+}
 </script>
 {% endblock %}
