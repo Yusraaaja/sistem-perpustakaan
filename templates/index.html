@@ -15,54 +15,9 @@
 
     <hr class="text-muted opacity-25 mb-4">
 
-    {# Cek apakah ada hasil pencarian #}
-    {% if results %}
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th>Judul Buku</th>
-                        <th>Penulis</th>
-                        <th>Stok</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for b in results %}
-                    <tr>
-                        <td>
-                            <a href="/buku/{{ b.id }}" class="text-decoration-none fw-bold text-primary">
-                                {{ b.judul }}
-                            </a>
-                        </td>
-                        <td>{{ b.penulis }}</td>
-                        <td>
-                            <span class="badge {{ 'bg-success' if b.stok > 0 else 'bg-danger' }}">
-                                {{ b.stok }} Tersedia
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-    {# Jika tidak ada hasil, tapi user sedang mencari sesuatu (query ada) #}
-    {% elif query %}
-        <div class="text-center py-5">
-            <div class="mb-3">
-                <i class="bi bi-search-heart text-muted" style="font-size: 4rem; opacity: 0.5;"></i>
-            </div>
-            <h5 class="text-secondary">Buku "<strong>{{ query }}</strong>" tidak ditemukan</h5>
-            <p class="text-muted small">Coba gunakan kata kunci lain atau periksa kembali ejaan Anda.</p>
-            <a href="/koleksi" class="btn btn-outline-secondary btn-sm mt-2">Lihat Semua Koleksi</a>
-        </div>
-
-    {# Kondisi awal saat halaman baru dibuka (opsional) #}
-    {% else %}
-        <div class="text-center py-4 text-muted">
-            <p>Gunakan kolom di atas untuk mencari buku di perpustakaan</p>
-        </div>
-    {% endif %}
+    <div class="text-center py-4 text-muted">
+        <p>Gunakan kolom di atas untuk mencari buku di perpustakaan</p>
+    </div>
 
     <div class="row mt-2 g-3">
         <div class="col-12">
@@ -119,33 +74,43 @@
             </div>
         </div>
     </div>
-</div>
+    <div class="card border-0 shadow-sm rounded-3 overflow-hidden mt-4" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);">
+        <div class="card-body p-4">
+            <div class="row align-items-center">
+                <div class="col-md-7 mb-3 mb-md-0">
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-1 mb-2 small text-uppercase" style="letter-spacing: 1px;">System Developer Profile</span>
+                    <h5 class="fw-bold mb-1 text-white">Muhamad Yusra Agam</h5>
+                    <p class="text-white-50 small mb-0" style="font-size: 12.5px; line-height: 1.6;">
+                        Pelajar Teknikal Jurusan RPL Vokasi IT, berfokus mengembangkan solusi rekayasa otomatisasi sistem data dan aplikasi terdistribusi performa tinggi. Hubungi saya untuk kerja sama bisnis pembuatan web SPA atau kustomisasi digitalisasi instansi.
+                    </p>
+                </div>
+                
+                <div class="col-md-5 text-md-end">
+                    <div class="d-flex flex-column gap-2">
+                        
+                        <a href="https://yusraaaja.github.io/" target="_blank" class="btn btn-sm btn-light text-dark fw-bold shadow-sm d-flex flex-column align-items-center justify-content-center py-2 border">
+                            <span class="d-flex align-items-center gap-2" style="font-size: 13px;">
+                                <i class="bi bi-github text-dark"></i> View My Portfolio Website
+                            </span>
+                            <span class="text-primary fw-mono mt-1" style="font-size: 11px; letter-spacing: 0.5px;">yusraaaja.github.io</span>
+                        </a>
+                        
+                        <div class="d-flex gap-2">
+                            <a href="https://www.linkedin.com/in/muhamadyusraagam/" target="_blank" class="btn btn-sm btn-light w-50 d-flex flex-column align-items-center justify-content-center py-2 fw-bold text-dark border shadow-sm">
+                                <span class="d-flex align-items-center gap-1" style="font-size: 11.5px;">
+                                    <i class="bi bi-linkedin text-primary"></i> LinkedIn
+                                </span>
+                                <span class="text-secondary fw-normal mt-1" style="font-size: 9.5px;">in/muhamadyusraagam</span>
+                            </a>
+                            
+                            <a href="https://instagram.com/muhamadyusraagam" target="_blank" class="btn btn-sm btn-light w-50 d-flex flex-column align-items-center justify-content-center py-2 fw-bold text-dark border shadow-sm">
+                                <span class="d-flex align-items-center gap-1" style="font-size: 11.5px;">
+                                    <i class="bi bi-instagram text-danger"></i> Instagram
+                                </span>
+                                <span class="text-secondary fw-normal mt-1" style="font-size: 9.5px;">@muhamadyusraagam</span>
+                            </a>
+                        </div>
 
-<div class="card border-0 shadow-sm rounded-3 overflow-hidden mt-4 bg-gradient text-white" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);">
-    <div class="card-body p-4">
-        <div class="row align-items-center">
-            <div class="col-md-8 mb-3 mb-md-0">
-                <span class="badge bg-warning text-dark fw-bold px-3 py-1 mb-2 small text-uppercase" style="letter-spacing: 1px;">System Developer Profile</span>
-                <h5 class="fw-bold mb-1 text-white">Muhamad Yusra Agam</h5>
-                <p class="text-white-50 small mb-0" style="font-size: 12px; line-height: 1.6;">
-                    Pelajar Teknikal Jurusan RPL Vokasi IT, berfokus mengembangkan solusi rekayasa otomatisasi sistem data dan aplikasi terdistribusi performa tinggi. Hubungi saya untuk kerja sama bisnis pembuatan web SPA atau kustomisasi digitalisasi instansi.
-                </p>
-            </div>
-            <div class="col-md-4 text-md-end">
-                <div class="d-flex flex-column gap-2">
-                    <a href="https://yusraaaja.github.io/" target="_blank" class="btn btn-sm btn-light text-primary fw-bold shadow-sm d-inline-flex align-items-center justify-content-center gap-2 py-2">
-                        <i class="bi bi-github fs-6 text-dark"></i> View My Portfolio Website
-                        <p class="bi bi-github fs-6 text-dark">Link : yusraaaja.github.io</p>
-                    </a>
-                    <div class="d-flex gap-2">
-                        <a href="https://www.linkedin.com/in/muhamadyusraagam/" target="_blank" class="btn btn-sm btn-outline-light w-50 py-1" style="font-size: 11px;">
-                            <i class="bi bi-linkedin me-1"></i> LinkedIn
-                            <p class="bi bi-linkedin me-1">Username : @muhamadyusraagam</p>
-                        </a>
-                        <a href="https://instagram.com/muhamadyusraagam" target="_blank" class="btn btn-sm btn-outline-light w-50 py-1" style="font-size: 11px;">
-                            <i class="bi bi-instagram me-1"></i> Instagram
-                            <p class="bi bi-instagram me-1">Username : @muhamadyusraagam</p>
-                        </a>
                     </div>
                 </div>
             </div>

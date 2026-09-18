@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Perpustakaan Digital{% endblock %}</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0B0F17',
+                        glasscard: 'rgba(15, 23, 42, 0.75)',
+                        violetaccent: '#8B5CF6',
+                        goldaccent: '#F59E0B'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Alpine.js (Reactive UI without Node) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- HTML5-QRCode Scanner -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glow-violet {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.25);
+        }
+    </style>
+</head>
+<body class="bg-darkbg text-slate-100 font-sans min-h-screen flex flex-col">
+
+    <!-- Header / Navbar Glassmorphism -->
+    <nav class="glass-panel sticky top-0 z-50 px-6 py-4 flex justify-between items-center border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-violetaccent/20 rounded-xl text-violetaccent">
+                <i data-lucide="book-open-check" class="w-6 h-6"></i>
+            </div>
+            <span class="text-xl font-bold tracking-wide bg-gradient-to-r from-white via-slate-200 to-violet-400 bg-clip-text text-transparent">
+                LibSys Digital
+            </span>
+        </div>
+        
+        <div class="flex items-center space-x-6 text-sm font-medium">
+            <a href="/" class="flex items-center space-x-2 text-slate-300 hover:text-violetaccent transition">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/koleksi" class="flex items-center space-x-2 text-slate-300 hover:text-violetaccent transition">
+                <i data-lucide="library" class="w-4 h-4"></i>
+                <span>Katalog Buku</span>
+            </a>
+            <a href="/peminjaman" class="flex items-center space-x-2 text-slate-300 hover:text-violetaccent transition">
+                <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+                <span>Sirkulasi</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow p-6 max-w-7xl mx-auto w-full">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

@@ -47,7 +47,7 @@
     <div class="col-md-9">
         
         <div class="mb-4 d-flex justify-content-between align-items-center">
-            <a href="{{ url_for('koleksi') }}" class="btn btn-outline-secondary btn-sm shadow-sm">
+            <a href="/koleksi" class="btn btn-outline-secondary btn-sm shadow-sm">
                 <i class="bi bi-arrow-left-circle"></i> Kembali ke Halaman Sebelumnya
             </a>
             {% if session.get('logged_in') %}
@@ -163,6 +163,7 @@
                                     <label class="text-muted d-block small">Lokasi Rak & Riwayat</label>
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="badge bg-dark px-3 py-2 fs-7"><i class="bi bi-geo-alt-fill text-warning me-1"></i> {{ buku.lokasi_rak }}</span>
+                                        {% if session.get('logged_in') %}
                                         <button type="button" 
                                                 class="btn btn-sm btn-outline-primary px-3 fw-bold" 
                                                 data-id="{{ buku.id }}" 
@@ -170,6 +171,7 @@
                                                 onclick="bukaPopupRiwayatBuku(this)">
                                             <i class="bi bi-clock-history"></i> Riwayat Buku
                                         </button>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <div class="modal fade" id="modalRiwayatBuku" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
@@ -226,10 +228,9 @@
                                     <div class="mb-3">
                                         <label class="fw-bold small mb-1 text-danger">Pilih Nomor Registrasi Fisik Tersedia *</label>
                                         <select name="no_registrasi" class="form-select form-select-sm fw-bold border-danger" required>
-                                            <option value="">-- Pilih No Registrasi Buku yang Dibawa Siswa --</option>
                                             {% if list_no_registrasi %}
                                                 {% for reg in list_no_registrasi %}
-                                                    <option value="{{ reg }}">{{ reg }} (Kondisi: {{ buku.kondisi_buku }})</option>
+                                                    <option value="{{ reg }}">{{ reg }}</option>
                                                 {% endfor %}
                                             {% else %}
                                                 <option value="{{ buku.id_buku_fisik }}">{{ buku.id_buku_fisik }}</option>
@@ -288,7 +289,7 @@
                                     <p class="text-muted mb-2" style="font-size: 12px; line-height: 1.5;">
                                         Silakan ambil buku fisik ini di rak kode <strong>{{ buku.lokasi_rak if buku.lokasi_rak else 'Tidak Diketahui' }}</strong>, kemudian bawa buku ke meja pelayanan pustakawan untuk dicatat oleh petugas menggunakan sistem perpustakaan.
                                     </p>
-                                    <span class="badge bg-secondary w-100 py-2">Stok Tersedia di Rak: {{ buku.stok }} Eksemplar</span>
+                                    <span class="badge bg-secondary w-100 py-2">Stok Tersedia di Rak: {{ list_no_registrasi | length }} Eksemplar</span>
                                 </div>
                             {% endif %}
                         </div>
@@ -305,38 +306,63 @@ function bukaPopupRiwayatBuku(element) {
     const judulBuku = element.getAttribute('data-judul');
 
     document.getElementById('judulModalRiwayat').innerHTML = `<i class="bi bi-clock-history me-2"></i> Riwayat: ${judulBuku}`;
+    
+    // PENYESUAIAN ID: Sesuai dengan id HTML di modal kamu
     const tbody = document.getElementById('tabelBodyRiwayat');
     const loader = document.getElementById('loadingRiwayat');
     
     tbody.innerHTML = '';
     loader.style.display = 'block';
     
+    // Tampilkan modal terlebih dahulu
     var myModal = new bootstrap.Modal(document.getElementById('modalRiwayatBuku'));
     myModal.show();
     
     fetch(`/api/riwayat_buku/${bukuId}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             loader.style.display = 'none';
-            if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-muted">Belum ada rekam jejak sirkulasi untuk eksemplar buku ini.</td></tr>`;
+            
+            // PERBAIKAN UTAMA: 'data' langsung berupa Array, bukan 'data.riwayat'
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted small fw-semibold"><i class="bi bi-info-circle me-1"></i> Belum ada rekam jejak sirkulasi untuk eksemplar buku ini.</td></tr>`;
                 return;
             }
+            
+            // Looping langsung dari array data
             data.forEach(p => {
                 let badgeStatus = '';
-                if(p.status === 'Dipinjam') badgeStatus = `<span class="badge bg-warning text-dark">Dipinjam</span>`;
-                else if(p.status === 'Selesai') badgeStatus = `<span class="badge bg-success">Selesai</span>`;
-                else if(p.status === 'Rusak') badgeStatus = `<span class="badge bg-danger">Rusak</span>`;
-                else if(p.status === 'Hilang') badgeStatus = `<span class="badge bg-secondary">Hilang</span>`;
-                else if(p.status === 'Dibayar/Lunas') badgeStatus = `<span class="badge bg-info text-dark">Dibayar/Lunas</span>`;
+                let statusClean = p.status ? p.status.trim() : '';
+
+                if (statusClean === 'Dipinjam') {
+                    badgeStatus = `<span class="badge bg-warning text-dark px-2 py-1">Dipinjam</span>`;
+                } else if (statusClean === 'Selesai' || statusClean === 'Kembali') {
+                    badgeStatus = `<span class="badge bg-success px-2 py-1">Selesai</span>`;
+                } else if (statusClean === 'Rusak') {
+                    badgeStatus = `<span class="badge bg-danger px-2 py-1">Rusak</span>`;
+                } else if (statusClean === 'Hilang') {
+                    badgeStatus = `<span class="badge bg-secondary px-2 py-1">Hilang</span>`;
+                } else if (statusClean === 'Dibayar/Lunas' || statusClean === 'Lunas') {
+                    badgeStatus = `<span class="badge bg-info text-dark px-2 py-1">Lunas</span>`;
+                } else {
+                    badgeStatus = `<span class="badge bg-dark px-2 py-1">${p.status || 'Misteri'}</span>`;
+                }
                 
                 let tglKembali = p.tgl_dikembalikan ? p.tgl_dikembalikan : '-';
-                let dendaUang = parseInt(p.denda) > 0 ? `Rp ${p.denda.toLocaleString('id-ID')}` : 'Rp 0';
+                
+                // Mencegah NaN denda jika tipenya null atau string kosong
+                let nominalDenda = parseInt(p.denda) || 0;
+                let dendaUang = nominalDenda > 0 ? `Rp ${nominalDenda.toLocaleString('id-ID')}` : 'Rp 0';
                 
                 tbody.innerHTML += `
                     <tr>
                         <td class="fw-bold text-dark">${p.id_anggota}</td>
-                        <td>${p.kelas} / ${p.jurusan}</td>
+                        <td>${p.kelas || '-'} / ${p.jurusan || '-'}</td>
                         <td>${p.tgl_pinjam}</td>
                         <td>${tglKembali}</td>
                         <td>${badgeStatus}</td>
@@ -346,8 +372,9 @@ function bukaPopupRiwayatBuku(element) {
             });
         })
         .catch(err => {
+            console.error("Error Fetching:", err);
             loader.style.display = 'none';
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-danger">Gagal menarik data histori sirkulasi server.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-danger small fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i> Gagal menarik data histori sirkulasi server.</td></tr>`;
         });
 }
 </script>
