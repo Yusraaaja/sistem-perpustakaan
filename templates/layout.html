@@ -2,44 +2,264 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem E-Perpus</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5.3 & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css"/>
+    
+    <style>
+        :root {
+            --bs-body-bg: #F8FAFC;
+            --bs-body-color: #0F172A;
+            --bs-primary: #4F46E5;
+            --bs-primary-rgb: 79, 70, 229;
+            --bs-success: #059669;
+            --bs-success-rgb: 5, 150, 105;
+            --bs-warning: #D97706;
+            --bs-warning-rgb: 217, 119, 6;
+            --bs-danger: #DC2626;
+            --bs-danger-rgb: 220, 38, 38;
+            --bs-border-color: #E2E8F0;
+            
+            --app-bg: #F8FAFC;
+            --app-surface: #FFFFFF;
+            --app-border: #E2E8F0;
+            --app-text: #0F172A;
+            --app-muted: #64748B;
+            --app-primary: #4F46E5;
+            --app-primary-hover: #4338CA;
+            --app-primary-subtle: #EEF2FF;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--app-bg);
+            color: var(--app-text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Typography Hierarchy */
+        .page-title {
+            font-size: 1.5rem; /* 24px */
+            font-weight: 700;
+            color: #0F172A;
+            letter-spacing: -0.02em;
+        }
+
+        .section-title {
+            font-size: 1.05rem; /* 16-17px */
+            font-weight: 600;
+            color: #0F172A;
+        }
+
+        /* Modern Light Navbar */
+        .app-navbar {
+            background-color: #FFFFFF;
+            border-bottom: 1px solid #E2E8F0;
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        .app-navbar .navbar-brand {
+            font-weight: 700;
+            font-size: 1.15rem;
+            color: #0F172A;
+            letter-spacing: -0.02em;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .app-navbar .navbar-brand .brand-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background-color: #EEF2FF;
+            color: #4F46E5;
+            font-size: 1rem;
+        }
+
+        .app-navbar .nav-link {
+            color: #64748B;
+            font-weight: 500;
+            font-size: 0.875rem; /* 14px */
+            padding: 0.45rem 0.85rem;
+            border-radius: 8px;
+            transition: all 0.15s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .app-navbar .nav-link:hover {
+            color: #0F172A;
+            background-color: #F1F5F9;
+        }
+
+        .app-navbar .btn-auth-login {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #4F46E5;
+            background-color: #EEF2FF;
+            border: 1px solid #C7D2FE;
+            padding: 0.4rem 0.9rem;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .app-navbar .btn-auth-login:hover {
+            background-color: #E0E7FF;
+            color: #3730A3;
+        }
+
+        .app-navbar .btn-auth-logout {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #DC2626;
+            background-color: #FEF2F2;
+            border: 1px solid #FECACA;
+            padding: 0.4rem 0.9rem;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .app-navbar .btn-auth-logout:hover {
+            background-color: #FEE2E2;
+            color: #B91C1C;
+        }
+
+        .app-navbar .navbar-toggler {
+            border: 1px solid #E2E8F0;
+            padding: 0.35rem 0.6rem;
+            border-radius: 8px;
+        }
+
+        .app-navbar .navbar-toggler:focus {
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        /* Modern Flash Alerts */
+        .app-alert {
+            border-radius: 10px;
+            border: 1px solid transparent;
+            font-size: 0.875rem;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+
+        .app-alert-success {
+            background-color: #ECFDF5;
+            border-color: #A7F3D0;
+            color: #065F46;
+        }
+
+        .app-alert-danger {
+            background-color: #FEF2F2;
+            border-color: #FECACA;
+            color: #991B1B;
+        }
+
+        .app-alert-warning {
+            background-color: #FFFBEB;
+            border-color: #FDE68A;
+            color: #92400E;
+        }
+
+        .app-alert-info {
+            background-color: #EFF6FF;
+            border-color: #BFDBFE;
+            color: #1E40AF;
+        }
+
+        /* Buttons Overrides */
+        .btn-primary {
+            background-color: #4F46E5;
+            border-color: #4F46E5;
+        }
+        .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+            background-color: #4338CA;
+            border-color: #4338CA;
+        }
+        .btn-success {
+            background-color: #059669;
+            border-color: #059669;
+        }
+        .btn-success:hover, .btn-success:focus, .btn-success:active {
+            background-color: #047857;
+            border-color: #047857;
+        }
+        
+        /* Surface Card Defaults */
+        .app-card {
+            background-color: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+    </style>
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+<body>
+<nav class="navbar navbar-expand-lg app-navbar mb-4 sticky-top">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="/">📚 E-Perpus</a>
-        <div class="navbar-nav ms-auto">
-            {% if session.get('logged_in') %}
-                <a class="nav-link text-danger" href="/logout">Logout</a>
-            {% else %}
-                <a class="nav-link text-primary fw-bold" href="{{ url_for('login') }}">Login Admin</a>
-            {% endif %}
-        </div>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <a class="navbar-brand" href="/">
+            <span class="brand-icon"><i class="bi bi-book-half"></i></span>
+            <span>E-Perpus</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
-            <div class="navbar-nav ms-auto">
+            <div class="navbar-nav me-auto ms-lg-3 gap-1">
                 <a class="nav-link" href="/"><i class="bi bi-search"></i> Cari Buku</a>
                 <a class="nav-link" href="/koleksi"><i class="bi bi-database"></i> Database</a>
                 <a class="nav-link" href="/peminjaman"><i class="bi bi-person-lines-fill"></i> Peminjaman</a>
             </div>
+            <div class="navbar-nav ms-auto align-items-lg-center gap-2 mt-2 mt-lg-0">
+                {% if session.get('logged_in') %}
+                    <span class="badge rounded-pill fw-medium d-none d-lg-inline-flex align-items-center gap-1" style="background-color: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; padding: 6px 12px; font-size: 12px;">
+                        <i class="bi bi-shield-check"></i> Mode Admin
+                    </span>
+                    <a class="btn-auth-logout" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a>
+                {% else %}
+                    <a class="btn-auth-login" href="{{ url_for('login') }}"><i class="bi bi-person-lock"></i> Login Admin</a>
+                {% endif %}
+            </div>
         </div>
     </div>
 </nav>
-<div class="container mt-4">
+
+<div class="container pb-5">
     
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="row justify-content-center">
             <div class="col-12">
                 {% for category, message in messages %}
-                  <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0 small py-2 mb-3" role="alert">
-                    <i class="bi {{ 'bi-check-circle-fill' if category == 'success' else 'bi-exclamation-triangle-fill' }} me-2"></i>
-                    {{ message }}
+                  <div class="alert app-alert app-alert-{{ category }} alert-dismissible fade show mb-3" role="alert">
+                    <i class="bi {{ 'bi-check-circle-fill text-success' if category == 'success' else ('bi-info-circle-fill text-primary' if category == 'info' else 'bi-exclamation-triangle-fill text-danger') }} me-2 fs-5"></i>
+                    <div class="flex-grow-1">{{ message }}</div>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                   </div>
                 {% endfor %}
@@ -54,13 +274,12 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
-    <script>
-        // Inisialisasi Fancybox agar siap digunakan
-        Fancybox.bind("[data-fancybox]", {
-            // Opsi tambahan (bisa dikosongkan)
-        });
-    </script>
+<script>
+    // Inisialisasi Fancybox agar siap digunakan
+    Fancybox.bind("[data-fancybox]", {
+        // Opsi tambahan (bisa dikosongkan)
+    });
+</script>
 </body>
 </html>

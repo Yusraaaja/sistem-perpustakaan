@@ -1,86 +1,133 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+<!-- Header & Action Bar -->
+<div class="d-flex flex-column flex-lg-row justify-content-lg-between align-items-lg-center gap-3 mb-4 mt-1">
     <div>
-        <h4 class="fw-bold mb-0 text-dark">Sistem Manajemen Aset & Inventaris</h4>
+        <h4 class="page-title mb-1">Sistem Manajemen Aset & Inventaris</h4>
         <p class="text-muted small mb-0">Kelola katalog publik, lokasi logistik rak, dan pelaporan denda</p>
     </div>
     
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap align-items-center gap-2">
         {% if session.get('logged_in') %}
-            <button type="button" class="btn btn-primary shadow-sm fw-bold px-3 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addBookModal">
-                <i class="bi bi-journal-plus fs-5"></i> + Tambah Buku Baru
+            <button type="button" class="btn btn-primary btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addBookModal">
+                <i class="bi bi-journal-plus fs-6"></i> Tambah Buku Baru
             </button>
 
-            <button type="button" class="btn btn-success shadow-sm fw-bold px-3 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#importExcelModal">
-                <i class="bi bi-file-earmark-excel fs-5"></i> Import Excel
+            <button type="button" class="btn btn-success btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm rounded-3" data-bs-toggle="modal" data-bs-target="#importExcelModal">
+                <i class="bi bi-file-earmark-excel fs-6"></i> Import Excel
             </button>
+            
             <form action="/reset_katalog_buku" method="POST" onsubmit="return konfirmasiHapusDatabase(event);" class="d-inline">
-                <button type="submit" class="btn btn-danger btn-sm shadow-sm fw-bold px-3 d-flex align-items-center gap-2">
-                    <i class="bi bi-trash3-fill"></i> Kosongkan Katalog Buku
+                <button type="submit" class="btn btn-outline-danger btn-sm px-2.5 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 rounded-3" title="Kosongkan Katalog Buku">
+                    <i class="bi bi-trash3"></i> Kosongkan Katalog
                 </button>
             </form>
         {% endif %}
         
-        <form action="/koleksi" method="GET" class="d-flex shadow-sm" style="width: 300px;">
-            <input type="text" name="query" class="form-control form-control-sm border-end-0 rounded-start" 
-                   placeholder="Cari Judul / No Registrasi / Penulis..." value="{{ query or '' }}">
-            <button type="submit" class="btn btn-sm btn-dark rounded-end px-3">
-                <i class="bi bi-search"></i>
-            </button>
+        <form action="/koleksi" method="GET" class="d-flex" style="min-width: 260px;">
+            <div class="input-group input-group-sm shadow-sm">
+                <input type="text" name="query" class="form-control rounded-start-3" 
+                       placeholder="Cari Judul / No Reg / Penulis..." value="{{ query or '' }}"
+                       style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                <button type="submit" class="btn btn-primary rounded-end-3 px-3">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
         </form>
     </div>
 </div>
 
+<!-- Metric Cards (4 Cards) -->
 <div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm bg-primary text-white p-3 rounded-3">
-            <small class="text-white-50 fw-bold text-uppercase">Total Volume Buku</small>
-            <h3 class="fw-bold mb-0 mt-1">{{ total_buku }} <span class="fs-6 fw-normal">Tersedia</span></h3>
+    <!-- Card 1: Total Volume Buku -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card app-card border-0 shadow-sm p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="text-uppercase text-muted fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total Volume Buku</span>
+                <div class="d-flex align-items-center justify-content-center rounded-3" style="width: 38px; height: 38px; background-color: #EEF2FF; color: #4F46E5;">
+                    <i class="bi bi-journal-bookmark-fill fs-5"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-bold text-dark mb-0" style="font-size: 1.75rem;">{{ total_buku }}</h3>
+                <span class="badge rounded-pill fw-medium" style="background-color: #EEF2FF; color: #4F46E5; font-size: 0.75rem;">Tersedia</span>
+            </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm bg-dark text-white p-3 rounded-3">
-            <small class="text-white-50 fw-bold text-uppercase">Variasi Judul</small>
-            <h3 class="fw-bold mb-0 mt-1">{{ total_judul }} <span class="fs-6 fw-normal">Judul</span></h3>
+    
+    <!-- Card 2: Variasi Judul -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card app-card border-0 shadow-sm p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="text-uppercase text-muted fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Variasi Judul</span>
+                <div class="d-flex align-items-center justify-content-center rounded-3" style="width: 38px; height: 38px; background-color: #F1F5F9; color: #475569;">
+                    <i class="bi bi-collection-fill fs-5"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-bold text-dark mb-0" style="font-size: 1.75rem;">{{ total_judul }}</h3>
+                <span class="badge rounded-pill fw-medium" style="background-color: #F1F5F9; color: #475569; font-size: 0.75rem;">Judul</span>
+            </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm bg-warning text-dark p-3 rounded-3">
-            <small class="text-dark-50 fw-bold text-uppercase">Sedang Dipinjam</small>
-            <h3 class="fw-bold mb-0 mt-1">{{ total_dipinjam }} <span class="fs-6 fw-normal">Buku</span></h3>
+    
+    <!-- Card 3: Sedang Dipinjam -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card app-card border-0 shadow-sm p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="text-uppercase text-muted fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Sedang Dipinjam</span>
+                <div class="d-flex align-items-center justify-content-center rounded-3" style="width: 38px; height: 38px; background-color: #FEF3C7; color: #D97706;">
+                    <i class="bi bi-arrow-left-right fs-5"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-bold text-dark mb-0" style="font-size: 1.75rem;">{{ total_dipinjam }}</h3>
+                <span class="badge rounded-pill fw-medium" style="background-color: #FEF3C7; color: #92400E; font-size: 0.75rem;">Buku</span>
+            </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm bg-danger text-white p-3 rounded-3">
-            <small class="text-white-50 fw-bold text-uppercase">Buku Populer Aktif</small>
-            <h3 class="fw-bold mb-0 mt-1">{{ buku_populer|length }} <span class="fs-6 fw-normal">Koleksi</span></h3>
+    
+    <!-- Card 4: Buku Populer Aktif -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card app-card border-0 shadow-sm p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="text-uppercase text-muted fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Buku Populer</span>
+                <div class="d-flex align-items-center justify-content-center rounded-3" style="width: 38px; height: 38px; background-color: #FEE2E2; color: #DC2626;">
+                    <i class="bi bi-fire fs-5"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-bold text-dark mb-0" style="font-size: 1.75rem;">{{ buku_populer|length }}</h3>
+                <span class="badge rounded-pill fw-medium" style="background-color: #FEE2E2; color: #991B1B; font-size: 0.75rem;">Koleksi</span>
+            </div>
         </div>
     </div>
 </div>
 
+<!-- Main Content Grid: Table + Sidebar -->
 <div class="row g-4">
+    <!-- Left Column: Master Table -->
     <div class="col-lg-9">
         {% if query %}
-            <div class="alert alert-info border-0 shadow-sm small d-flex justify-content-between align-items-center py-2 mb-3">
+            <div class="alert app-alert app-alert-info d-flex justify-content-between align-items-center py-2 px-3 mb-3">
                 <span><i class="bi bi-info-circle me-2"></i>Menampilkan hasil pencarian untuk: <strong>"{{ query }}"</strong></span>
-                <a href="/koleksi" class="btn btn-sm btn-link text-danger text-decoration-none fw-bold p-0">Clear Filter</a>
+                <a href="/koleksi" class="btn btn-sm btn-link text-danger text-decoration-none fw-semibold p-0">Clear Filter</a>
             </div>
         {% endif %}
 
-        <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+        <div class="card app-card border-0 shadow-sm overflow-hidden">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th class="ps-3" style="width: 15%;">No Registrasi</th>
-                            <th style="width: 40%;">Detail Informasi Buku</th>
-                            <th style="width: 20%;">Kategori</th>
-                            <th style="width: 15%;">Lokasi Rak</th>
-                            <th class="text-center" style="width: 10%;">Stok</th>
+                    <thead style="background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                        <tr class="text-uppercase text-secondary" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <th class="ps-3 py-3" style="width: 14%;">No Registrasi</th>
+                            <th class="py-3" style="width: 38%;">Detail Informasi Buku</th>
+                            <th class="py-3" style="width: 18%;">Kategori</th>
+                            <th class="py-3" style="width: 14%;">Lokasi Rak</th>
+                            <th class="py-3 text-center" style="width: 8%;">Stok</th>
                             {% if session.get('logged_in') %}
-                            <th class="text-center pe-3" style="width: 15%;">Aksi</th>
+                            <th class="py-3 text-center pe-3" style="width: 8%;">Aksi</th>
                             {% endif %}
                         </tr>
                     </thead>
@@ -88,7 +135,7 @@
                         {% if buku %}
                             {% for b in buku %}
                             <tr>
-                                <td class="text-center">
+                                <td class="ps-3 text-center">
                                     {% if b.id_buku_fisik %}
                                         {# Langkah 1: Bersihkan semua simbol kurung siku dan tanda petik dari string JSON #}
                                         {% set clean_str = b.id_buku_fisik.replace('[','').replace(']','').replace('"','').replace("'",'') %}
@@ -96,8 +143,8 @@
                                         {# Langkah 2: Pecah string berdasarkan koma menjadi list kembali di sisi UI #}
                                         {% for reg_num in clean_str.split(',') %}
                                             {% if reg_num.strip() %}
-                                                <span class="badge bg-light text-dark border font-monospace small mb-1 shadow-xs d-inline-block px-2 py-1">
-                                                    <i class="bi bi-tag-fill text-secondary me-1"></i>{{ reg_num.strip() }}
+                                                <span class="badge font-monospace mb-1 d-inline-flex align-items-center" style="background-color: #F1F5F9; color: #334155; border: 1px solid #E2E8F0; font-size: 11px; padding: 3px 6px;">
+                                                    <i class="bi bi-tag-fill text-muted me-1" style="font-size: 10px;"></i>{{ reg_num.strip() }}
                                                 </span>
                                             {% endif %}
                                         {% endfor %}
@@ -106,29 +153,53 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="/buku/{{ b.id }}" class="fw-bold text-primary text-decoration-none d-block mb-0-link">
+                                    <a href="/buku/{{ b.id }}" class="fw-bold text-decoration-none d-block mb-1 text-dark" style="font-size: 0.875rem;">
                                         {{ b.judul }}
                                     </a>
                                     {% if b.sub_judul %}
-                                        <small class="text-muted d-block italic small mb-1">{{ b.sub_judul }}</small>
+                                        <small class="text-muted d-block fst-italic mb-1" style="font-size: 0.75rem;">{{ b.sub_judul }}</small>
                                     {% endif %}
-                                    <small class="text-secondary d-block" style="font-size: 0.8rem;">
-                                        Penulis: {{ b.penulis }} | Penerbit: {{ b.penerbit or '-' }}
-                                    </small>
+                                    <div class="text-secondary d-flex flex-wrap gap-2 align-items-center" style="font-size: 0.75rem;">
+                                        <span><i class="bi bi-person me-1"></i>{{ b.penulis }}</span>
+                                        <span class="text-muted opacity-50">•</span>
+                                        <span><i class="bi bi-building me-1"></i>{{ b.penerbit or '-' }}</span>
+                                        {% if b.tahun_terbit %}
+                                            <span class="text-muted opacity-50">•</span>
+                                            <span>{{ b.tahun_terbit }}</span>
+                                        {% endif %}
+                                    </div>
                                 </td>
-                                <td><span class="badge bg-light text-dark border px-3 py-1.5 rounded-pill">{{ b.kategori }}</span></td>
-                                <td class="small fw-semibold text-secondary"><i class="bi bi-box-seam me-1"></i>{{ b.lokasi_rak or 'Belum Diatur' }}</td>
-                                <td class="text-center">
-                                    <span class="badge {{ 'bg-success' if b.stok > 0 else 'bg-danger' }} rounded-2 px-2 py-1">
-                                        {{ b.stok }} Eksemplar
+                                <td>
+                                    <span class="badge rounded-pill fw-medium" style="background-color: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; font-size: 0.75rem; padding: 4px 10px;">
+                                        {{ b.kategori }}
                                     </span>
+                                </td>
+                                <td>
+                                    <span class="fw-medium text-secondary" style="font-size: 0.8125rem;">
+                                        <i class="bi bi-geo-alt text-muted me-1"></i>{{ b.lokasi_rak or 'Belum Diatur' }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    {% if b.stok > 0 %}
+                                        <span class="badge rounded-pill fw-semibold" style="background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.75rem; padding: 4px 9px;">
+                                            <i class="bi bi-check2 me-1"></i>{{ b.stok }} Eks
+                                        </span>
+                                    {% else %}
+                                        <span class="badge rounded-pill fw-semibold" style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; font-size: 0.75rem; padding: 4px 9px;">
+                                            <i class="bi bi-x me-1"></i>Habis
+                                        </span>
+                                    {% endif %}
                                 </td>
 
                                 {% if session.get('logged_in') %}
                                 <td class="text-center pe-3">
-                                    <div class="btn-group btn-group-sm shadow-sm">
-                                        <a href="/edit/{{ b.id }}" class="btn btn-outline-primary"><i class="bi bi-pencil-square"></i></a>
-                                        <a href="/delete/{{ b.id }}" class="btn btn-outline-danger" onclick="return confirm('Hapus aset buku ini dari gudang sistem?')"><i class="bi bi-trash"></i></a>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/edit/{{ b.id }}" class="btn btn-outline-secondary" title="Edit Buku" style="border-color: #E2E8F0; color: #475569;">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="/delete/{{ b.id }}" class="btn btn-outline-danger" onclick="return confirm('Hapus aset buku ini dari gudang sistem?')" title="Hapus Buku" style="border-color: #FECACA;">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
                                     </div>
                                 </td>
                                 {% endif %}
@@ -136,11 +207,11 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="6" class="text-center py-5 bg-light text-muted">
-                                    <i class="bi bi-folder-x text-secondary d-block mb-2" style="font-size: 2.5rem;"></i>
+                                <td colspan="6" class="text-center py-5 bg-white text-muted">
+                                    <i class="bi bi-folder-x text-secondary d-block mb-2" style="font-size: 2.5rem; opacity: 0.6;"></i>
                                     <h6 class="fw-bold text-dark mb-1">Data Koleksi Tidak Ditemukan</h6>
-                                    <p class="small mb-0">Kata kunci pencarian tidak cocok dengan judul, pengarang, maupun ID fisik mana pun.</p>
-                                    <a href="/koleksi" class="btn btn-sm btn-outline-dark mt-3 px-4">Muat Ulang Semua Data</a>
+                                    <p class="small mb-0 text-secondary">Kata kunci pencarian tidak cocok dengan judul, pengarang, maupun nomor registrasi mana pun.</p>
+                                    <a href="/koleksi" class="btn btn-sm btn-outline-secondary mt-3 px-4 rounded-3">Muat Ulang Semua Data</a>
                                 </td>
                             </tr>
                         {% endif %}
@@ -150,179 +221,222 @@
         </div>
     </div>
 
+    <!-- Right Column: Popular Books Sidebar -->
     <div class="col-lg-3">
-        <div class="card shadow-sm border-0 rounded-3 p-3 bg-white h-100">
-            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-fire text-danger me-2"></i>Peminjaman Populer</h6>
+        <div class="card app-card border-0 shadow-sm p-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                <i class="bi bi-fire text-danger fs-5"></i>
+                <h6 class="fw-bold text-dark mb-0" style="font-size: 0.9375rem;">Peminjaman Populer</h6>
+            </div>
             
             {% if buku_populer %}
-                <ol class="list-group list-group-numbered list-group-flush">
+                <ol class="list-group list-group-flush p-0">
                 {% for bp in buku_populer %}
-                    <li class="list-group-item d-flex justify-content-between align-items-start px-0 py-2 small">
-                        <div class="ms-2 me-auto">
-                            <div class="fw-bold text-truncate" style="max-width: 150px;">{{ bp.judul }}</div>
-                            <span class="text-muted" style="font-size: 0.75rem;">{{ bp.kategori }}</span>
+                    <li class="list-group-item d-flex justify-content-between align-items-start px-0 py-2.5 bg-transparent border-bottom">
+                        <div class="me-2" style="min-width: 0;">
+                            <div class="fw-semibold text-dark text-truncate" style="font-size: 0.8125rem;">{{ bp.judul }}</div>
+                            <span class="text-muted" style="font-size: 0.72rem;">{{ bp.kategori }}</span>
                         </div>
-                        <span class="badge bg-danger rounded-pill">{{ bp.total_dipinjam }}x Pinjam</span>
+                        <span class="badge rounded-pill fw-semibold flex-shrink-0" style="background-color: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; font-size: 0.72rem;">
+                            {{ bp.total_dipinjam }}x Pinjam
+                        </span>
                     </li>
                 {% endfor %}
                 </ol>
             {% else %}
-                <div class="text-center py-4 text-muted small italic">
-                    <i class="bi bi-graph-up d-block mb-1 text-black-50"></i> Belum ada rekaman sirkulasi transaksi.
+                <div class="text-center py-4 text-muted small">
+                    <i class="bi bi-graph-up d-block mb-2 fs-4 text-muted opacity-50"></i>
+                    Belum ada rekaman sirkulasi transaksi.
                 </div>
             {% endif %}
         </div>
     </div>
 </div>
 
+<!-- Modal Tambah Buku Baru -->
 <div class="modal fade" id="addBookModal" tabindex="-1" aria-labelledby="addBookModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-dark text-white py-3">
-                <h5 class="modal-title fw-bold small-title" id="addBookModalLabel">
-                    <i class="bi bi-file-earmark-medical text-primary me-2"></i> Registrasi Katalog & Manajemen Aset Baru
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-white border-bottom py-3 px-4">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-3 p-1.5 d-flex align-items-center justify-content-center" style="background-color: #EEF2FF; color: #4F46E5; width: 34px; height: 34px;">
+                        <i class="bi bi-journal-plus fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0" id="addBookModalLabel">Registrasi Katalog & Aset Baru</h6>
+                        <small class="text-muted" style="font-size: 0.75rem;">Lengkapi informasi bibliografi dan logistik buku fisik</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
             <form action="/add" method="POST" enctype="multipart/form-data">
-                <div class="modal-body p-4" style="max-height: 70vh; overflow-y: auto;">
-                    
+                <div class="modal-body p-4" style="max-height: 72vh; overflow-y: auto;">
                     <div class="row g-4">
-                        <div class="col-md-6 border-end">
-                            <h6 class="fw-bold text-primary text-uppercase small mb-3 pb-1 border-bottom"><i class="bi bi-globe me-1"></i> I. Katalog Informasi Publik</h6>
+                        <!-- Kolom Kiri: Informasi Bibliografi Publik -->
+                        <div class="col-md-6 pe-md-3 border-end">
+                            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                                <i class="bi bi-globe text-primary"></i>
+                                <span class="fw-bold text-uppercase text-secondary" style="font-size: 0.75rem; letter-spacing: 0.05em;">I. Informasi Bibliografi</span>
+                            </div>
                             
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Judul Utama Buku *</label>
-                                <input type="text" name="judul" class="form-control form-control-sm" placeholder="Wajib diisi" required>
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">Judul Utama Buku <span class="text-danger">*</span></label>
+                                <input type="text" name="judul" class="form-control form-control-sm rounded-2" placeholder="Judul buku lengkap" required>
                             </div>
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Sub Judul / Keterangan Edisi</label>
-                                <input type="text" name="sub_judul" class="form-control form-control-sm" placeholder="Edisi Revisi / Jilid 1 (Opsional)">
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">Sub Judul / Edisi</label>
+                                <input type="text" name="sub_judul" class="form-control form-control-sm rounded-2" placeholder="Contoh: Edisi Revisi (Opsional)">
                             </div>
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Nama Penulis *</label>
-                                <input type="text" name="penulis" class="form-control form-control-sm" placeholder="Nama penulis asli" required>
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">Nama Penulis <span class="text-danger">*</span></label>
+                                <input type="text" name="penulis" class="form-control form-control-sm rounded-2" placeholder="Nama penulis / pengarang" required>
                             </div>
-                            <div class="row g-2 mb-2">
+                            <div class="row g-2 mb-2.5">
                                 <div class="col-6">
-                                    <label class="fw-bold small text-secondary mb-1">Penerbit</label>
-                                    <input type="text" name="penerbit" class="form-control form-control-sm" placeholder="Nama penerbit">
+                                    <label class="form-label fw-semibold text-secondary small mb-1">Penerbit</label>
+                                    <input type="text" name="penerbit" class="form-control form-control-sm rounded-2" placeholder="Nama penerbit">
                                 </div>
                                 <div class="col-6">
-                                    <label class="fw-bold small text-secondary mb-1">Tahun Terbit</label>
-                                    <input type="text" name="tahun_terbit" class="form-control form-control-sm" placeholder="Contoh: 2026">
+                                    <label class="form-label fw-semibold text-secondary small mb-1">Tahun Terbit</label>
+                                    <input type="text" name="tahun_terbit" class="form-control form-control-sm rounded-2" placeholder="Contoh: 2024">
                                 </div>
                             </div>
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Kategori Klasifikasi *</label>
-                                <input type="text" name="kategori" class="form-control form-control-sm" placeholder="Pemrograman / Novel / Sejarah" required>
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">Kategori Klasifikasi <span class="text-danger">*</span></label>
+                                <input type="text" name="kategori" class="form-control form-control-sm rounded-2" placeholder="Pemrograman / Sains / Sastra" required>
                             </div>
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Nomor ISBN</label>
-                                <input type="text" name="isbn" class="form-control form-control-sm" placeholder="Barcode ISBN Buku">
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">Nomor ISBN</label>
+                                <input type="text" name="isbn" class="form-control form-control-sm rounded-2" placeholder="978-xxx-xxx">
                             </div>
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Foto Sampul / Cover (Opsional)</label>
-                                <input type="file" name="cover_img" class="form-control form-control-sm" accept=".png, .jpg, .jpeg">
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">Foto Sampul / Cover</label>
+                                <input type="file" name="cover_img" class="form-control form-control-sm rounded-2" accept=".png, .jpg, .jpeg">
                             </div>
                             <div class="mb-0">
-                                <label class="fw-bold small text-secondary mb-1">Sinopsis</label>
-                                <textarea name="sinopsis" class="form-control form-control-sm" rows="2" placeholder="Ringkasan isi buku..."></textarea>
+                                <label class="form-label fw-semibold text-secondary small mb-1">Sinopsis Ringkas</label>
+                                <textarea name="sinopsis" class="form-control form-control-sm rounded-2" rows="2" placeholder="Ringkasan isi buku..."></textarea>
                             </div>
                         </div>
 
-                        <div class="col-md-6">
-                            <h6 class="fw-bold text-success text-uppercase small mb-3 pb-1 border-bottom"><i class="bi bi-shield-lock me-1"></i> II. Logistik & Nilai Aset Internal</h6>
+                        <!-- Kolom Kanan: Logistik & Nilai Aset -->
+                        <div class="col-md-6 ps-md-3">
+                            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                                <i class="bi bi-box-seam text-success"></i>
+                                <span class="fw-bold text-uppercase text-secondary" style="font-size: 0.75rem; letter-spacing: 0.05em;">II. Logistik & Aset Fisik</span>
+                            </div>
                             
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">No Registrasi *</label>
-                                <input type="text" name="id_buku_fisik" class="form-control form-control-sm" placeholder="Contoh: 00523110" required>
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">No Registrasi Fisik <span class="text-danger">*</span></label>
+                                <input type="text" name="id_buku_fisik" class="form-control form-control-sm rounded-2 font-monospace" placeholder="Contoh: 00000101, 00000102" required>
+                                <small class="text-muted" style="font-size: 0.7rem;">Pisahkan dengan koma jika mendaftarkan lebih dari 1 eksemplar.</small>
                             </div>
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Kode / Posisi Rak Lokasi</label>
-                                <input type="text" name="lokasi_rak" class="form-control form-control-sm" placeholder="Contoh: Rak A-02">
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">Kode / Lokasi Rak</label>
+                                <input type="text" name="lokasi_rak" class="form-control form-control-sm rounded-2" placeholder="Contoh: Rak A-02">
                             </div>
-                            <div class="mb-2">
-                                <label class="fw-bold small text-secondary mb-1">Sumber Perolehan Buku</label>
-                                <select name="sumber_perolehan" class="form-select form-select-sm">
+                            <div class="mb-2.5">
+                                <label class="form-label fw-semibold text-secondary small mb-1">Sumber Perolehan</label>
+                                <select name="sumber_perolehan" class="form-select form-select-sm rounded-2">
                                     <option value="Pembelian">Pembelian Rutin</option>
                                     <option value="Hadiah">Hadiah / Hibah</option>
                                     <option value="Sumbangan">Sumbangan Siswa</option>
                                 </select>
                             </div>
-                            <div class="row g-2">
+                            <div class="row g-2 mb-3">
                                 <div class="col-6">
-                                    <label class="fw-bold small text-secondary mb-1">Harga Buku (Rp) *</label>
-                                    <input type="number" name="harga_buku" class="form-control form-control-sm" placeholder="Untuk denda Opsi A" value="0">
+                                    <label class="form-label fw-semibold text-secondary small mb-1">Harga Buku (Rp) <span class="text-danger">*</span></label>
+                                    <input type="number" name="harga_buku" class="form-control form-control-sm rounded-2" placeholder="Nilai ganti rugi" value="0">
                                 </div>
                                 <div class="col-6">
-                                    <label class="fw-bold small text-secondary mb-1">Stok (Otomatis) *</label>
-                                    <input type="number" name="stok" class="form-control form-control-sm bg-light fw-bold" value="1" readonly required>
+                                    <label class="form-label fw-semibold text-secondary small mb-1">Stok (Otomatis) <span class="text-danger">*</span></label>
+                                    <input type="number" name="stok" class="form-control form-control-sm rounded-2 bg-light fw-bold text-primary" value="1" readonly required>
                                 </div>
                             </div>
-                            <div class="alert alert-warning border-0 mt-3 small py-2 mb-0">
-                                <i class="bi bi-exclamation-circle me-1"></i> <strong>Pemberitahuan:</strong> Nilai harga buku wajib diisi akurat demi kebutuhan validasi otomatis klaim ganti rugi denda.
+                            
+                            <div class="p-3 rounded-3 border" style="background-color: #FFFBEB; border-color: #FDE68A !important;">
+                                <div class="d-flex align-items-start gap-2">
+                                    <i class="bi bi-info-circle-fill text-warning mt-0.5"></i>
+                                    <div class="small text-secondary" style="font-size: 0.75rem; line-height: 1.4;">
+                                        <strong>Catatan Logistik:</strong> Nilai harga buku digunakan otomatis dalam perhitungan denda ganti rugi buku hilang/rusak (Opsi A). Stok akan sinkron sesuai jumlah nomor registrasi fisik.
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-
                 </div>
-                <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-sm btn-primary px-4 fw-bold shadow-sm">Simpan Data Aset</button>
+                
+                <div class="modal-footer bg-white border-top py-2.5 px-4 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3 rounded-2" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-primary px-4 fw-semibold rounded-2 shadow-sm">Simpan Data Aset</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<!-- Modal Import Excel -->
 <div class="modal fade" id="importExcelModal" tabindex="-1" aria-labelledby="importExcelModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-3">
-            <div class="modal-header bg-success text-white py-3">
-                <h5 class="modal-title fw-bold" id="importExcelModalLabel">
-                    <i class="bi bi-file-earmark-excel-fill me-2"></i>Sinkronisasi Massal via Excel
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-white border-bottom py-3 px-4">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-3 p-1.5 d-flex align-items-center justify-content-center" style="background-color: #ECFDF5; color: #059669; width: 34px; height: 34px;">
+                        <i class="bi bi-file-earmark-excel-fill fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0" id="importExcelModalLabel">Sinkronisasi Massal via Excel</h6>
+                        <small class="text-muted" style="font-size: 0.75rem;">Unggah dokumen spreadsheet katalog perpustakaan</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
             <form action="{{ url_for('import_excel') }}" method="POST" enctype="multipart/form-data">
                 <div class="modal-body p-4">
-                    <div class="alert alert-info py-2 small border-0 shadow-xs mb-3">
-                        <i class="bi bi-info-circle-fill me-1"></i> Aturan Struktur Kolom Berdasarkan Dokumen Patokan:<br>
-                        Wajib memiliki header persis berikut: <br>
-                        <code class="text-dark fw-bold">judul, penulis, penerbit, tahun_terbit, isbn, kategori, sinopsis, lokasi_rak, sumber_perolehan, tanggal_masuk, kondisi_buku, harga_buku, no_registrasi_list</code>
+                    <div class="p-3 rounded-3 mb-3 border" style="background-color: #EFF6FF; border-color: #BFDBFE !important;">
+                        <div class="d-flex align-items-start gap-2 mb-1.5">
+                            <i class="bi bi-info-circle-fill text-primary mt-0.5"></i>
+                            <span class="fw-semibold text-primary" style="font-size: 0.78rem;">Header Kolom Wajib Berdasarkan Patokan:</span>
+                        </div>
+                        <div class="p-2 rounded font-monospace bg-white border text-dark small" style="font-size: 0.72rem; word-break: break-all;">
+                            judul, penulis, penerbit, tahun_terbit, isbn, kategori, sinopsis, lokasi_rak, sumber_perolehan, tanggal_masuk, kondisi_buku, harga_buku, no_registrasi_list
+                        </div>
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold small text-secondary">Pilih File Spreadsheet (.xlsx / .xls) *</label>
-                        <input type="file" name="excel_file" class="form-control form-control-sm" accept=".xlsx, .xls" required>
+                        <label class="form-label fw-semibold text-secondary small mb-1">Pilih File Spreadsheet (.xlsx / .xls) <span class="text-danger">*</span></label>
+                        <input type="file" name="excel_file" class="form-control form-control-sm rounded-2" accept=".xlsx, .xls" required>
                     </div>
                     
-                    <div class="bg-light p-2 rounded small text-muted border">
+                    <div class="p-2.5 rounded-3 border bg-light text-muted small" style="font-size: 0.75rem;">
                         <i class="bi bi-lightbulb text-warning me-1"></i>
-                        <strong>Tips:</strong> Pada kolom <code class="text-danger">no_registrasi_list</code> di Excel, pisahkan deretan nomor registrasi fisik buku dengan tanda koma (contoh: 00412854, 00412855). Stok aplikasi akan otomatis terhitung dari sana!
+                        <strong>Tips:</strong> Pada kolom <code class="text-danger">no_registrasi_list</code> di Excel, pisahkan deretan nomor registrasi fisik buku dengan tanda koma (contoh: 00412854, 00412855). Stok aplikasi akan otomatis terhitung dari sana.
                     </div>
                 </div>
                 
-                <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-sm btn-success px-4 fw-bold shadow-sm">Mulai Upload & Proses</button>
+                <div class="modal-footer bg-white border-top py-2.5 px-4 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3 rounded-2" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-success px-4 fw-semibold rounded-2 shadow-sm">Mulai Upload & Proses</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
 <script>
+// Kalkulasi stok otomatis dari input no registrasi fisik
 document.querySelector('input[name="id_buku_fisik"]').addEventListener('input', function() {
     let nilaiInput = this.value;
-    // Pecah string berdasarkan koma dan saring yang tidak kosong
-    let jumlahBuku = nilaiInput.split(',').map(item => item.strip ? item.strip() : item.trim()).filter(item => item !== "").length;
-    
-    // Update nilai input stok di layar, minimal tetap 1 jika kosong
-    document.querySelector('input[name="stok"]').value = jumlahBuku > 0 ? jumlahBuku : 1;
+    let jumlahBuku = nilaiInput.split(',').map(item => item.trim()).filter(item => item !== "").length;
+    let stokEl = document.querySelector('input[name="stok"]');
+    if (stokEl) {
+        stokEl.value = jumlahBuku > 0 ? jumlahBuku : 1;
+    }
 });
 
+// Konfirmasi ganda pengosongan database
 function konfirmasiHapusDatabase(event) {
     event.preventDefault();
     const form = event.target;
