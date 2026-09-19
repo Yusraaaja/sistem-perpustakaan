@@ -1,300 +1,475 @@
 {% extends 'layout.html' %}
+
 {% block content %}
-{# --- TAMBAHKAN CSS KUSTOM DI SINI --- #}
 <style>
-    /* Container untuk efek hover */
-    .cover-hover-container {
+    /* Cover Card & Hover Preview */
+    .cover-card-container {
+        background-color: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        padding: 1.25rem;
+    }
+
+    .cover-hover-wrapper {
         position: relative;
         overflow: hidden;
+        border-radius: 10px;
         cursor: pointer;
-        transition: transform 0.3s ease;
+        display: block;
+        background-color: #F8FAFC;
     }
 
-    /* Efek Zoom in saat hover pada container */
-    .cover-hover-container:hover {
-        transform: scale(1.03); /* Sedikit membesar */
-    }
-
-    /* Transisi untuk gambar utama */
     .cover-image-detail {
-        transition: filter 0.3s ease;
-    }
-
-    /* Membuat gambar agak gelap saat hover agar ikon zoom terlihat */
-    .cover-hover-container:hover .cover-image-detail {
-        filter: brightness(70%);
-    }
-
-    /* Overlay untuk ikon zoom */
-    .hover-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
         width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0); /* Awalnya transparan */
-        opacity: 0; /* Awalnya tidak terlihat */
-        transition: opacity 0.3s ease, background-color 0.3s ease;
+        max-height: 400px;
+        object-fit: cover;
+        transition: transform 0.3s ease, filter 0.3s ease;
+        display: block;
+    }
+
+    .cover-hover-wrapper:hover .cover-image-detail {
+        transform: scale(1.03);
+        filter: brightness(85%);
+    }
+
+    .cover-hover-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(15, 23, 42, 0.25);
+        opacity: 0;
+        transition: opacity 0.25s ease;
         z-index: 2;
     }
 
-    /* Menampilkan ikon zoom saat hover */
-    .cover-hover-container:hover .hover-overlay {
+    .cover-hover-wrapper:hover .cover-hover-overlay {
         opacity: 1;
     }
+
+    .zoom-badge {
+        background-color: rgba(255, 255, 255, 0.95);
+        color: #0F172A;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        font-size: 1.2rem;
+    }
+
+    /* Meta Information Box */
+    .meta-item {
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        height: 100%;
+    }
+
+    .meta-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748B;
+        margin-bottom: 0.25rem;
+    }
+
+    .meta-value {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #0F172A;
+    }
+
+    /* Monospace Registration Badge */
+    .reg-badge {
+        font-family: monospace;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        background-color: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-radius: 6px;
+        color: #334155;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
 </style>
-<div class="row justify-content-center mt-4">
-    <div class="col-md-9">
-        
-        <div class="mb-4 d-flex justify-content-between align-items-center">
-            <a href="/koleksi" class="btn btn-outline-secondary btn-sm shadow-sm">
-                <i class="bi bi-arrow-left-circle"></i> Kembali ke Halaman Sebelumnya
+
+<!-- Top Toolbar Navigation -->
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 mt-1">
+    <a href="/koleksi" class="btn btn-outline-secondary btn-sm px-3 py-1.5 rounded-3 d-inline-flex align-items-center gap-2" style="border-color: #CBD5E1; color: #475569;">
+        <i class="bi bi-arrow-left"></i> Kembali ke Katalog
+    </a>
+    
+    {% if session.get('logged_in') %}
+        <div class="d-flex align-items-center gap-2">
+            <a href="/edit/{{ buku.id }}" class="btn btn-outline-primary btn-sm px-3 py-1.5 rounded-3 d-inline-flex align-items-center gap-1.5">
+                <i class="bi bi-pencil-square"></i> Edit Data
             </a>
+            <a href="/delete/{{ buku.id }}" class="btn btn-outline-danger btn-sm px-3 py-1.5 rounded-3 d-inline-flex align-items-center gap-1.5" onclick="return confirm('Hapus buku ini dari database sistem?')">
+                <i class="bi bi-trash3"></i> Hapus
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Main Book Detail Layout -->
+<div class="row g-4 mb-5">
+    <!-- Left Column: Cover & Quick Physical Status -->
+    <div class="col-lg-4 col-md-5">
+        <div class="cover-card-container mb-4">
+            {# --- AREA GAMBAR COVER DENGAN FANCYBOX --- #}
+            {% if buku.cover_img %}
+                <a href="{{ url_for('static', filename='covers/' + buku.cover_img) }}" 
+                   data-fancybox="gallery" 
+                   data-caption="{{ buku.judul }} - {{ buku.penulis }}"
+                   class="cover-hover-wrapper shadow-xs">
+                    
+                    <img src="{{ url_for('static', filename='covers/' + buku.cover_img) }}" 
+                         alt="Cover {{ buku.judul }}" 
+                         class="cover-image-detail">
+                    
+                    {# --- IKON ZOOM SAAT HOVER --- #}
+                    <div class="cover-hover-overlay">
+                        <div class="zoom-badge">
+                            <i class="bi bi-zoom-in"></i>
+                        </div>
+                    </div>
+                </a>
+            {% else %}
+                {# --- PLACEHOLDER JIKA BELUM ADA COVER --- #}
+                <div class="d-flex flex-column align-items-center justify-content-center w-100 rounded-3 border" style="height: 360px; background-color: #F8FAFC;">
+                    <i class="bi bi-book text-muted" style="font-size: 3.5rem; opacity: 0.35;"></i>
+                    <p class="small mt-2 text-muted mb-0">Belum ada foto sampul</p>
+                </div>
+            {% endif %}
+
+            {# --- QUICK PHYSICAL STATUS BADGES --- #}
+            <div class="pt-3 mt-3 border-top">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small">Status Logistik:</span>
+                    {% if buku.stok > 0 %}
+                        <span class="badge rounded-pill fw-semibold" style="background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.75rem;">
+                            <i class="bi bi-check-circle me-1"></i>Tersedia
+                        </span>
+                    {% else %}
+                        <span class="badge rounded-pill fw-semibold" style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; font-size: 0.75rem;">
+                            <i class="bi bi-x-circle me-1"></i>Dipinjam Semua
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <span class="text-muted small">Lokasi Rak:</span>
+                    <span class="fw-semibold text-dark small">
+                        <i class="bi bi-geo-alt text-primary me-1"></i>{{ buku.lokasi_rak or 'Belum Diatur' }}
+                    </span>
+                </div>
+
+                {% if session.get('logged_in') %}
+                    <button type="button" 
+                            class="btn btn-outline-primary btn-sm w-100 rounded-2 py-1.5 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-xs" 
+                            data-id="{{ buku.id }}" 
+                            data-judul="{{ buku.judul }}" 
+                            onclick="bukaPopupRiwayatBuku(this)">
+                        <i class="bi bi-clock-history"></i> Lihat Riwayat Sirkulasi
+                    </button>
+                {% endif %}
+            </div>
+
+            {# --- FORM GANTI / UNGGAH COVER (KHUSUS ADMIN) --- #}
             {% if session.get('logged_in') %}
-                <div class="d-flex gap-2">
-                    <a href="/edit/{{ buku.id }}" class="btn btn-primary btn-sm"><i class="bi bi-pencil-square"></i> Edit Data</a>
-                    <a href="/delete/{{ buku.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Hapus buku ini?')"><i class="bi bi-trash3"></i> Hapus</a>
+                <div class="mt-3 w-100">
+                    <button class="btn btn-light btn-sm w-100 rounded-2 py-1.5 text-secondary border d-flex align-items-center justify-content-center gap-1.5" data-bs-toggle="collapse" data-bs-target="#formGantiCover" style="font-size: 0.8125rem;">
+                        <i class="bi bi-camera"></i> {{ 'Ganti Cover Buku' if buku.cover_img else 'Unggah Cover Buku' }}
+                    </button>
+                    <div class="collapse mt-2" id="formGantiCover">
+                        <div class="p-3 bg-light rounded-3 border">
+                            <form action="/buku/{{ buku.id }}/upload_cover" method="POST" enctype="multipart/form-data">
+                                <label class="form-label small fw-semibold text-secondary mb-1">Pilih File Gambar:</label>
+                                <input type="file" name="cover_file" class="form-control form-control-sm mb-2 rounded-2" accept="image/*" required>
+                                <button type="submit" class="btn btn-primary btn-sm w-100 rounded-2 fw-semibold">Simpan Cover</button>
+                            </form>
+                            <div class="text-muted mt-1 text-center" style="font-size: 0.7rem;">Format: PNG, JPG, JPEG, GIF</div>
+                        </div>
+                    </div>
                 </div>
             {% endif %}
         </div>
+    </div>
 
-        <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-5">
-            <div class="row g-0">
-                <div class="col-md-4 p-4 text-center bg-light border-end d-flex flex-column align-items-center justify-content-center">
-                    
-                    {# --- AREA GAMBAR COVER (UNTUK ADMIN & USER) --- #}
-                    {% if buku.cover_img %}
-                        {# --- TAMBAHKAN LINK FANCYBOX DAN KELAS HOVER DI SINI --- #}
-                        <a href="{{ url_for('static', filename='covers/' + buku.cover_img) }}" 
-                        data-fancybox="gallery" 
-                        data-caption="{{ buku.judul }} - {{ buku.penulis }}"
-                        class="d-block w-100 cover-hover-container">
-                            
-                            <img src="{{ url_for('static', filename='covers/' + buku.cover_img) }}" 
-                                alt="Cover {{ buku.judul }}" 
-                                class="img-fluid rounded-3 shadow cover-image-detail" 
-                                style="max-height: 400px; width: 100%; object-fit: cover;">
-                            
-                            {# --- IKON ZOOM SAAT HOVER --- #}
-                            <div class="hover-overlay d-flex align-items-center justify-content-center rounded-3">
-                                <i class="bi bi-search text-white" style="font-size: 2.5rem;"></i>
-                            </div>
-                        </a>
-                    {% else %}
-                        {# --- PLACEHOLDER JIKA BELUM ADA COVER (UNTUK USER BIASA) --- #}
-                        {% if not session.get('logged_in') %}
-                            <div class="d-flex flex-column align-items-center justify-content-center w-100" style="height: 400px;">
-                                <i class="bi bi-book" style="font-size: 4rem; opacity: 0.3;"></i>
-                                <p class="small mt-2 text-muted">Belum ada cover</p>
-                            </div>
-                        {% endif %}
-                    {% endif %}
-
-                    {# --- TOMBOL GANTI COVER (KHUSUS ADMIN) --- #}
-                    {% if session.get('logged_in') %}
-                        {% if buku.cover_img %}
-                            <div class="mt-3 w-100">
-                                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formGantiCover">
-                                    <i class="bi bi-pencil-square"></i> Ganti Cover
-                                </button>
-                                <div class="collapse mt-2" id="formGantiCover">
-                                    <form action="/buku/{{ buku.id }}/upload_cover" method="POST" enctype="multipart/form-data">
-                                        <input type="file" name="cover_file" class="form-control form-control-sm mb-2" accept="image/*" required>
-                                        <button type="submit" class="btn btn-primary btn-sm w-100">Unggah Gambar Baru</button>
-                                    </form>
-                                </div>
-                            </div>
-                        {% else %}
-                            {# --- AREA UNGGAH COVER PERTAMA (KHUSUS ADMIN) --- #}
-                            <div class="w-100 border-4 border-dashed rounded-3 p-4 text-muted d-flex flex-column align-items-center justify-content-center" style="min-height: 400px; background-color: #f8f9fa;">
-                                <i class="bi bi-image-fill mb-3" style="font-size: 3rem;"></i>
-                                <h6 class="fw-bold text-dark">Cover Kosong</h6>
-                                <p class="small text-center mb-4">Gunakan tombol di bawah untuk menambahkan gambar cover.</p>
-                                
-                                <form action="/buku/{{ buku.id }}/upload_cover" method="POST" enctype="multipart/form-data" class="w-100 px-2">
-                                    <input type="file" name="cover_file" class="form-control form-control-sm mb-2" accept="image/*" required>
-                                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">Unggah Cover</button>
-                                </form>
-                                <small class="text-muted mt-2">(PNG, JPG, JPEG, GIF)</small>
-                            </div>
-                        {% endif %}
+    <!-- Right Column: Metadata, Synopsis & Circulation -->
+    <div class="col-lg-8 col-md-7">
+        <div class="card app-card border-0 shadow-sm p-4 mb-4">
+            <!-- Header & Classification -->
+            <div class="mb-3">
+                <span class="badge rounded-pill fw-medium mb-2" style="background-color: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; font-size: 0.75rem; padding: 4px 12px;">
+                    {{ buku.kategori }}
+                </span>
+                <h3 class="page-title mb-1 text-dark">{{ buku.judul }}</h3>
+                {% if buku.sub_judul %}
+                    <p class="text-muted fst-italic mb-2" style="font-size: 0.9375rem;">{{ buku.sub_judul }}</p>
+                {% endif %}
+                <div class="text-secondary d-flex flex-wrap gap-2 align-items-center" style="font-size: 0.8125rem;">
+                    <span><i class="bi bi-person me-1"></i><strong>Penulis:</strong> {{ buku.penulis }}</span>
+                    <span class="text-muted opacity-50">•</span>
+                    <span><i class="bi bi-building me-1"></i><strong>Penerbit:</strong> {{ buku.penerbit or '-' }}</span>
+                    {% if buku.tahun_terbit %}
+                        <span class="text-muted opacity-50">•</span>
+                        <span><strong>Tahun:</strong> {{ buku.tahun_terbit }}</span>
                     {% endif %}
                 </div>
+            </div>
 
-                <div class="col-12 col-md-8 p-4">
-                    <h2 class="fw-bold text-dark mb-1">{{ buku.judul }}</h2>
-                    <h5 class="text-muted mb-4">{{ buku.sub_judul if buku.sub_judul else '' }}</h5>
-                    
-                    <div class="row g-3 mb-4">
-                        <div class="col-12 col-sm-6">
-                            <small class="text-muted d-block">Penulis / Pengarang</small>
-                            <span class="fw-semibold text-dark">{{ buku.penulis }}</span>
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            <small class="text-muted d-block">ISBN</small>
-                            <span class="fw-semibold text-dark">{{ buku.isbn if buku.isbn else '-' }}</span>
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            <small class="text-muted d-block">Penerbit & Tahun</small>
-                            <span class="fw-semibold text-dark">{{ buku.penerbit }} ({{ buku.tahun_terbit if buku.tahun_terbit else '-' }})</span>
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            <small class="text-muted d-block">Klasifikasi DDC / Kategori</small>
-                            <span class="badge bg-secondary">{{ buku.kategori }}</span>
-                        </div>
-                        
-                        <div class="col-12 pt-3 border-top">
-                            <h6 class="fw-bold text-uppercase text-primary small mb-3">
-                                <i class="bi bi-pin-angle"></i> Lokasi & Manajemen Fisik Buku
-                            </h6>
-                            <div class="row g-2 bg-white p-3 rounded shadow-xs border">
-                                <div class="col-6 col-sm-4">
-                                    <small class="text-muted d-block">Nomor Registrasi Buku</small>
-                                    <code class="text-dark fw-bold fs-6">
-                                        {% if buku.id_buku_fisik %}
-                                            {# Membersihkan karakter JSON [ " ] agar tampil sebagai teks biasa #}
-                                            {{ buku.id_buku_fisik.replace('[','').replace(']','').replace('"','').replace("'",'') }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </code>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="text-muted d-block small">Lokasi Rak & Riwayat</label>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="badge bg-dark px-3 py-2 fs-7"><i class="bi bi-geo-alt-fill text-warning me-1"></i> {{ buku.lokasi_rak }}</span>
-                                        {% if session.get('logged_in') %}
-                                        <button type="button" 
-                                                class="btn btn-sm btn-outline-primary px-3 fw-bold" 
-                                                data-id="{{ buku.id }}" 
-                                                data-judul="{{ buku.judul }}" 
-                                                onclick="bukaPopupRiwayatBuku(this)">
-                                            <i class="bi bi-clock-history"></i> Riwayat Buku
-                                        </button>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="modal fade" id="modalRiwayatBuku" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
-                                    <div class="modal-dialog modal-lg modal-dialog-centered">
-                                        <div class="modal-content rounded-3 border-0 shadow-lg">
-                                            <div class="modal-header bg-primary text-white py-3">
-                                                <h6 class="modal-title fw-bold" id="judulModalRiwayat"><i class="bi bi-journal-text me-2"></i> Log Riwayat Peminjaman Buku</h6>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-for="Close"></button>
-                                            </div>
-                                            <div class="modal-body p-0">
-                                                <div class="table-responsive" style="max-height: 380px;">
-                                                    <table class="table table-striped table-hover align-middle mb-0 small">
-                                                        <thead class="table-dark sticky-top">
-                                                            <tr>
-                                                                <th>Nama Peminjam</th>
-                                                                <th>Kelas/Jurusan</th>
-                                                                <th>Tgl Pinjam</th>
-                                                                <th>Tgl Kembali</th>
-                                                                <th>Status</th>
-                                                                <th>Denda</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="tabelBodyRiwayat">
-                                                            </tbody>
-                                                    </table>
-                                                </div>
-                                                <div id="loadingRiwayat" class="text-center py-4 text-muted">
-                                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div> Loading log riwayat...
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+            <hr class="text-muted opacity-25 my-3">
+
+            <!-- Section 1: Detail Bibliografi & Aset Fisik -->
+            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center gap-2" style="font-size: 0.875rem;">
+                <i class="bi bi-info-circle text-primary"></i> Detail Informasi & Logistik
+            </h6>
+            
+            <div class="row g-2.5 mb-4">
+                <div class="col-sm-6 col-md-4">
+                    <div class="meta-item">
+                        <div class="meta-label">Nomor ISBN</div>
+                        <div class="meta-value font-monospace">{{ buku.isbn if buku.isbn else '-' }}</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="meta-item">
+                        <div class="meta-label">Kondisi Buku</div>
+                        <div class="meta-value">
+                            <span class="badge rounded-pill fw-medium" style="background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.72rem;">
+                                {{ buku.kondisi_buku or 'Baik' }}
+                            </span>
                         </div>
                     </div>
-
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-dark">Sinopsis Buku</h6>
-                        <p class="text-secondary small" style="line-height: 1.6;">{{ buku.sinopsis if buku.sinopsis else 'Tidak ada sinopsis untuk buku ini.' }}</p>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="meta-item">
+                        <div class="meta-label">Sumber Perolehan</div>
+                        <div class="meta-value">{{ buku.sumber_perolehan or 'Pembelian' }}</div>
                     </div>
-
-                    <div class="card border-0 shadow-sm rounded-3 mt-4" style="background-color: #f8f9fa;">
-                        <div class="card-body p-4">
-                            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-bookmark-plus text-primary"></i> Sirkulasi Eksemplar Fisik</h5>
-                            
-                            {% if session.get('logged_in') %}
-                                {# --- HANYA MUNCUL JIKA ADMIN SUDAH LOGIN --- #}
-                                {% if buku.stok > 0 %}
-                                <form action="/proses_pinjam_admin" method="POST">
-                                    <input type="hidden" name="back_url" value="{{ request.path }}">
-                                    <input type="hidden" name="tipe_user" value="Siswa">
-                                    
-                                    <div class="mb-3">
-                                        <label class="fw-bold small mb-1 text-danger">Pilih Nomor Registrasi Fisik Tersedia *</label>
-                                        <select name="no_registrasi" class="form-select form-select-sm fw-bold border-danger" required>
-                                            {% if list_no_registrasi %}
-                                                {% for reg in list_no_registrasi %}
-                                                    <option value="{{ reg }}">{{ reg }}</option>
-                                                {% endfor %}
-                                            {% else %}
-                                                <option value="{{ buku.id_buku_fisik }}">{{ buku.id_buku_fisik }}</option>
-                                            {% endif %}
-                                        </select>
-                                        <div class="form-text text-muted small" style="font-size: 11px;">
-                                            * Ambil nomor seri yang tertera pada cap/stiker fisik buku yang dibawa oleh siswa ke meja perpus.
-                                        </div>
-                                    </div>
-
-                                    <div class="row">
-                                        <div class="col-md-7 mb-3">
-                                            <label class="fw-bold small mb-1">Nama Lengkap Siswa / Peminjam *</label>
-                                            <input type="text" name="id_anggota" class="form-control form-control-sm" placeholder="Ketik nama siswa..." required>
-                                        </div>
-                                        
-                                        <div class="col-md-5 mb-3">
-                                            <label class="fw-bold small mb-1 text-primary">Durasi Pinjam *</label>
-                                            <select name="durasi_pinjam" class="form-select form-select-sm fw-bold border-primary" required>
-                                                <option value="1">1 Hari (Kilat)</option>
-                                                <option value="3">3 Hari</option>
-                                                <option value="7" selected>7 Hari (Normal)</option>
-                                                <option value="14">14 Hari</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div class="row">
-                                        <div class="col-6 mb-3">
-                                            <label class="fw-bold small mb-1">Kelas *</label>
-                                            <select name="kelas" class="form-select form-select-sm" required>
-                                                <option value="">-- Pilih --</option>
-                                                <option value="X">Kelas 10 (X)</option>
-                                                <option value="XI">Kelas 11 (XI)</option>
-                                                <option value="XII">Kelas 12 (XII)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-6 mb-3">
-                                            <label class="fw-bold small mb-1">Jurusan / Divisi *</label>
-                                            <input type="text" name="jurusan" class="form-control form-control-sm" placeholder="Contoh: RPL" required>
-                                        </div>
-                                    </div>
-                                    
-                                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold mt-2 shadow-sm">Konfirmasi Pinjam Buku Sekarang</button>
-                                </form>
-                                {% else %}
-                                <div class="alert alert-danger mb-0 border-0 shadow-xs">
-                                    <i class="bi bi-exclamation-triangle-fill"></i> <strong>Mohon Maaf:</strong> Seluruh eksemplar fisik buku ini sedang dipinjam atau dalam kondisi perbaikan.
-                                </div>
-                                {% endif %}
-                                
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="meta-item">
+                        <div class="meta-label">Tanggal Masuk</div>
+                        <div class="meta-value">{{ buku.tanggal_masuk or '-' }}</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="meta-item">
+                        <div class="meta-label">Harga / Nilai Aset</div>
+                        <div class="meta-value text-primary">
+                            Rp {{ "{:,}".format(buku.harga_buku).replace(',', '.') if buku.harga_buku else '0' }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="meta-item">
+                        <div class="meta-label">Stok Siap Dipinjam</div>
+                        <div class="meta-value">
+                            {{ buku.stok }} Eksemplar
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="meta-item">
+                        <div class="meta-label">Daftar Nomor Registrasi Fisik Terdaftar</div>
+                        <div class="d-flex flex-wrap gap-1.5 mt-1">
+                            {% if buku.id_buku_fisik %}
+                                {# Membersihkan karakter JSON [ " ] agar tampil rapi sebagai badge list #}
+                                {% set clean_str = buku.id_buku_fisik.replace('[','').replace(']','').replace('"','').replace("'",'') %}
+                                {% for reg in clean_str.split(',') %}
+                                    {% if reg.strip() %}
+                                        <span class="reg-badge">
+                                            <i class="bi bi-tag-fill text-muted" style="font-size: 9px;"></i>{{ reg.strip() }}
+                                        </span>
+                                    {% endif %}
+                                {% endfor %}
                             {% else %}
-                                {# --- TAMPILAN UNTUK USER BIASA / SISWA YANG LIHAT KATALOG --- #}
-                                <div class="alert alert-info border-0 shadow-sm small mb-0">
-                                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-info-circle-fill text-primary me-1"></i> Cara Meminjam Buku Fisik:</h6>
-                                    <p class="text-muted mb-2" style="font-size: 12px; line-height: 1.5;">
-                                        Silakan ambil buku fisik ini di rak kode <strong>{{ buku.lokasi_rak if buku.lokasi_rak else 'Tidak Diketahui' }}</strong>, kemudian bawa buku ke meja pelayanan pustakawan untuk dicatat oleh petugas menggunakan sistem perpustakaan.
-                                    </p>
-                                    <span class="badge bg-secondary w-100 py-2">Stok Tersedia di Rak: {{ list_no_registrasi | length }} Eksemplar</span>
-                                </div>
+                                <span class="text-muted small">-</span>
                             {% endif %}
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Section 2: Sinopsis Buku -->
+            <div class="mb-2">
+                <h6 class="fw-bold text-dark mb-2" style="font-size: 0.875rem;">
+                    <i class="bi bi-text-paragraph text-primary me-1"></i> Sinopsis Ringkas
+                </h6>
+                <div class="p-3 rounded-3 bg-light text-secondary small" style="line-height: 1.65; border: 1px solid #E2E8F0;">
+                    {{ buku.sinopsis if buku.sinopsis else 'Tidak ada sinopsis yang tercatat untuk buku ini.' }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Sirkulasi & Layanan Peminjaman -->
+        <div class="card app-card border-0 shadow-sm p-4">
+            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-3 p-1.5 d-flex align-items-center justify-content-center" style="background-color: #EEF2FF; color: #4F46E5; width: 32px; height: 32px;">
+                        <i class="bi bi-bookmark-plus fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0" style="font-size: 0.9375rem;">Sirkulasi & Layanan Peminjaman</h6>
+                        <small class="text-muted" style="font-size: 0.75rem;">Proses pencatatan peminjaman fisik buku untuk siswa</small>
+                    </div>
+                </div>
+                {% if buku.stok > 0 %}
+                    <span class="badge rounded-pill fw-semibold" style="background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.75rem; padding: 4px 10px;">
+                        <i class="bi bi-check-circle me-1"></i>{{ buku.stok }} Eksemplar Siap
+                    </span>
+                {% else %}
+                    <span class="badge rounded-pill fw-semibold" style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; font-size: 0.75rem; padding: 4px 10px;">
+                        <i class="bi bi-x-circle me-1"></i>Stok Habis
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if session.get('logged_in') %}
+                {# --- HANYA MUNCUL JIKA ADMIN SUDAH LOGIN --- #}
+                {% if buku.stok > 0 %}
+                <form action="/proses_pinjam_admin" method="POST">
+                    <input type="hidden" name="back_url" value="{{ request.path }}">
+                    <input type="hidden" name="tipe_user" value="Siswa">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark small mb-1">
+                            Pilih Nomor Registrasi Eksemplar Tersedia <span class="text-danger">*</span>
+                        </label>
+                        <select name="no_registrasi" class="form-select form-select-sm rounded-2 font-monospace" required style="border-color: #CBD5E1;">
+                            {% if list_no_registrasi %}
+                                {% for reg in list_no_registrasi %}
+                                    <option value="{{ reg }}">{{ reg }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="{{ buku.id_buku_fisik }}">{{ buku.id_buku_fisik }}</option>
+                            {% endif %}
+                        </select>
+                        <div class="text-muted mt-1" style="font-size: 0.72rem;">
+                            * Pilih nomor registrasi yang tertera pada stiker fisik buku yang dibawa siswa ke meja perpus.
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-7">
+                            <label class="form-label fw-semibold text-dark small mb-1">Nama Lengkap Siswa / Peminjam <span class="text-danger">*</span></label>
+                            <input type="text" name="id_anggota" class="form-control form-control-sm rounded-2" placeholder="Ketik nama lengkap siswa..." required style="border-color: #CBD5E1;">
+                        </div>
+                        
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold text-dark small mb-1">Durasi Pinjam <span class="text-danger">*</span></label>
+                            <select name="durasi_pinjam" class="form-select form-select-sm rounded-2" required style="border-color: #CBD5E1;">
+                                <option value="1">1 Hari (Kilat)</option>
+                                <option value="3">3 Hari</option>
+                                <option value="7" selected>7 Hari (Standar)</option>
+                                <option value="14">14 Hari (Khusus)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold text-dark small mb-1">Kelas <span class="text-danger">*</span></label>
+                            <select name="kelas" class="form-select form-select-sm rounded-2" required style="border-color: #CBD5E1;">
+                                <option value="">-- Pilih Kelas --</option>
+                                <option value="X">Kelas 10 (X)</option>
+                                <option value="XI">Kelas 11 (XI)</option>
+                                <option value="XII">Kelas 12 (XII)</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold text-dark small mb-1">Jurusan / Divisi <span class="text-danger">*</span></label>
+                            <input type="text" name="jurusan" class="form-control form-control-sm rounded-2" placeholder="Contoh: RPL" required style="border-color: #CBD5E1;">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold rounded-2 py-2 shadow-sm d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-check2-circle fs-6"></i> Konfirmasi Pinjam Buku Sekarang
+                    </button>
+                </form>
+                {% else %}
+                <div class="alert app-alert app-alert-danger mb-0">
+                    <i class="bi bi-exclamation-triangle-fill text-danger me-2 fs-5"></i>
+                    <div>
+                        <strong>Pemberitahuan Logistik:</strong> Seluruh eksemplar fisik buku ini sedang dipinjam atau dalam status perawatan.
+                    </div>
+                </div>
+                {% endif %}
+                
+            {% else %}
+                {# --- TAMPILAN UNTUK USER BIASA / SISWA YANG LIHAT KATALOG --- #}
+                <div class="p-3 rounded-3 border" style="background-color: #EFF6FF; border-color: #BFDBFE !important;">
+                    <div class="d-flex align-items-start gap-2 mb-2">
+                        <i class="bi bi-info-circle-fill text-primary fs-5 mt-0.5"></i>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-1" style="font-size: 0.875rem;">Prosedur Peminjaman Buku Fisik:</h6>
+                            <p class="text-secondary mb-2" style="font-size: 0.8125rem; line-height: 1.5;">
+                                Silakan ambil buku fisik ini di rak lokasi <strong>{{ buku.lokasi_rak if buku.lokasi_rak else 'Rak Perpustakaan' }}</strong>, kemudian bawa buku ke meja sirkulasi untuk dicatat oleh pustakawan menggunakan sistem perpustakaan.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between p-2 rounded-2 bg-white border">
+                        <span class="text-muted small fw-medium">Stok Fisik Tersedia di Rak:</span>
+                        <span class="badge rounded-pill fw-semibold" style="background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
+                            {{ list_no_registrasi | length }} Eksemplar Siap Pinjam
+                        </span>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal AJAX Riwayat Peminjaman Buku -->
+<div class="modal fade" id="modalRiwayatBuku" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-white border-bottom py-3 px-4">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-3 p-1.5 d-flex align-items-center justify-content-center" style="background-color: #EEF2FF; color: #4F46E5; width: 34px; height: 34px;">
+                        <i class="bi bi-clock-history fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0" id="judulModalRiwayat">Log Riwayat Peminjaman Buku</h6>
+                        <small class="text-muted" style="font-size: 0.75rem;">Rekam jejak sirkulasi peminjaman eksemplar</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive" style="max-height: 380px;">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead style="background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                            <tr class="text-uppercase text-secondary" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                <th class="ps-3 py-2.5">Nama Peminjam</th>
+                                <th class="py-2.5">Kelas / Jurusan</th>
+                                <th class="py-2.5">Tgl Pinjam</th>
+                                <th class="py-2.5">Tgl Kembali</th>
+                                <th class="py-2.5 text-center">Status</th>
+                                <th class="py-2.5 text-end pe-3">Denda</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelBodyRiwayat">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="loadingRiwayat" class="text-center py-4 text-muted">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                    <span class="small">Memuat histori sirkulasi...</span>
+                </div>
+            </div>
+            <div class="modal-footer bg-white border-top py-2.5 px-4 d-flex justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary px-3 rounded-2" data-bs-dismiss="modal">Tutup</button>
             </div>
         </div>
     </div>
@@ -305,16 +480,19 @@ function bukaPopupRiwayatBuku(element) {
     const bukuId = element.getAttribute('data-id');
     const judulBuku = element.getAttribute('data-judul');
 
-    document.getElementById('judulModalRiwayat').innerHTML = `<i class="bi bi-clock-history me-2"></i> Riwayat: ${judulBuku}`;
+    const judulEl = document.getElementById('judulModalRiwayat');
+    if (judulEl) {
+        judulEl.innerHTML = `<i class="bi bi-clock-history me-1.5 text-primary"></i> Riwayat: ${judulBuku}`;
+    }
     
-    // PENYESUAIAN ID: Sesuai dengan id HTML di modal kamu
+    // Penyesuaian ID sesuai DOM contract
     const tbody = document.getElementById('tabelBodyRiwayat');
     const loader = document.getElementById('loadingRiwayat');
     
     tbody.innerHTML = '';
     loader.style.display = 'block';
     
-    // Tampilkan modal terlebih dahulu
+    // Tampilkan modal via Bootstrap API
     var myModal = new bootstrap.Modal(document.getElementById('modalRiwayatBuku'));
     myModal.show();
     
@@ -328,45 +506,41 @@ function bukaPopupRiwayatBuku(element) {
         .then(data => {
             loader.style.display = 'none';
             
-            // PERBAIKAN UTAMA: 'data' langsung berupa Array, bukan 'data.riwayat'
             if (!data || data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted small fw-semibold"><i class="bi bi-info-circle me-1"></i> Belum ada rekam jejak sirkulasi untuk eksemplar buku ini.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted small fw-medium"><i class="bi bi-info-circle me-1"></i> Belum ada rekam jejak sirkulasi untuk eksemplar buku ini.</td></tr>`;
                 return;
             }
             
-            // Looping langsung dari array data
             data.forEach(p => {
                 let badgeStatus = '';
                 let statusClean = p.status ? p.status.trim() : '';
 
                 if (statusClean === 'Dipinjam') {
-                    badgeStatus = `<span class="badge bg-warning text-dark px-2 py-1">Dipinjam</span>`;
+                    badgeStatus = `<span class="badge rounded-pill fw-semibold" style="background-color: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 0.72rem;">Dipinjam</span>`;
                 } else if (statusClean === 'Selesai' || statusClean === 'Kembali') {
-                    badgeStatus = `<span class="badge bg-success px-2 py-1">Selesai</span>`;
+                    badgeStatus = `<span class="badge rounded-pill fw-semibold" style="background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.72rem;">Selesai</span>`;
                 } else if (statusClean === 'Rusak') {
-                    badgeStatus = `<span class="badge bg-danger px-2 py-1">Rusak</span>`;
+                    badgeStatus = `<span class="badge rounded-pill fw-semibold" style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; font-size: 0.72rem;">Rusak</span>`;
                 } else if (statusClean === 'Hilang') {
-                    badgeStatus = `<span class="badge bg-secondary px-2 py-1">Hilang</span>`;
+                    badgeStatus = `<span class="badge rounded-pill fw-semibold" style="background-color: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; font-size: 0.72rem;">Hilang</span>`;
                 } else if (statusClean === 'Dibayar/Lunas' || statusClean === 'Lunas') {
-                    badgeStatus = `<span class="badge bg-info text-dark px-2 py-1">Lunas</span>`;
+                    badgeStatus = `<span class="badge rounded-pill fw-semibold" style="background-color: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; font-size: 0.72rem;">Lunas</span>`;
                 } else {
-                    badgeStatus = `<span class="badge bg-dark px-2 py-1">${p.status || 'Misteri'}</span>`;
+                    badgeStatus = `<span class="badge rounded-pill fw-semibold" style="background-color: #F1F5F9; color: #334155; font-size: 0.72rem;">${p.status || '-'}</span>`;
                 }
                 
                 let tglKembali = p.tgl_dikembalikan ? p.tgl_dikembalikan : '-';
-                
-                // Mencegah NaN denda jika tipenya null atau string kosong
                 let nominalDenda = parseInt(p.denda) || 0;
-                let dendaUang = nominalDenda > 0 ? `Rp ${nominalDenda.toLocaleString('id-ID')}` : 'Rp 0';
+                let dendaUang = nominalDenda > 0 ? `<span class="text-danger fw-bold">Rp ${nominalDenda.toLocaleString('id-ID')}</span>` : `<span class="text-muted">Rp 0</span>`;
                 
                 tbody.innerHTML += `
                     <tr>
-                        <td class="fw-bold text-dark">${p.id_anggota}</td>
-                        <td>${p.kelas || '-'} / ${p.jurusan || '-'}</td>
-                        <td>${p.tgl_pinjam}</td>
-                        <td>${tglKembali}</td>
-                        <td>${badgeStatus}</td>
-                        <td class="text-danger fw-bold">${dendaUang}</td>
+                        <td class="ps-3 fw-semibold text-dark" style="font-size: 0.8125rem;">${p.id_anggota}</td>
+                        <td class="text-secondary" style="font-size: 0.75rem;">${p.kelas || '-'} / ${p.jurusan || '-'}</td>
+                        <td class="text-secondary" style="font-size: 0.75rem;">${p.tgl_pinjam}</td>
+                        <td class="text-secondary" style="font-size: 0.75rem;">${tglKembali}</td>
+                        <td class="text-center">${badgeStatus}</td>
+                        <td class="text-end pe-3" style="font-size: 0.8125rem;">${dendaUang}</td>
                     </tr>
                 `;
             });
@@ -374,7 +548,7 @@ function bukaPopupRiwayatBuku(element) {
         .catch(err => {
             console.error("Error Fetching:", err);
             loader.style.display = 'none';
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-danger small fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i> Gagal menarik data histori sirkulasi server.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-danger small fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i> Gagal memuat data histori sirkulasi server.</td></tr>`;
         });
 }
 </script>
