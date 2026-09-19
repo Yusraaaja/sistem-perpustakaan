@@ -1,19 +1,56 @@
 {% extends 'layout.html' %}
+
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card shadow border-0 p-4">
-            <h3 class="fw-bold text-center mb-4">Login Admin</h3>
-            <form method="POST">
+<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
+    <div class="col-11 col-sm-9 col-md-6 col-lg-4">
+        <div class="card app-card border-0 shadow-sm rounded-4 p-4 p-sm-5">
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-3 mb-3" 
+                     style="width: 52px; height: 52px; background-color: #EEF2FF; color: #4F46E5;">
+                    <i class="bi bi-shield-lock-fill fs-3"></i>
+                </div>
+                <h4 class="fw-bold text-dark mb-1" style="letter-spacing: -0.02em;">Login Administrator</h4>
+                <p class="text-muted small mb-0">Masuk untuk mengelola katalog aset, transaksi peminjaman, dan inventaris buku</p>
+            </div>
+
+            <form action="/login" method="POST">
                 <div class="mb-3">
-                    <label class="form-label">Username</label>
-                    <input type="text" name="username" class="form-control" required>
+                    <label class="form-label fw-semibold small mb-1.5 text-dark">
+                        Username <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group input-group-sm rounded-3 overflow-hidden">
+                        <span class="input-group-text bg-white border-end-0 text-muted ps-3" style="border-color: #E2E8F0;">
+                            <i class="bi bi-person"></i>
+                        </span>
+                        <input type="text" name="username" class="form-control border-start-0 py-2.5 fw-medium" 
+                               placeholder="Masukkan username" style="border-color: #E2E8F0; font-size: 0.875rem;" 
+                               required autofocus>
+                    </div>
                 </div>
+
                 <div class="mb-4">
-                    <label class="form-label">Password</label>
-                    <input type="password" name="password" class="form-control" required>
+                    <label class="form-label fw-semibold small mb-1.5 text-dark">
+                        Password <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group input-group-sm rounded-3 overflow-hidden">
+                        <span class="input-group-text bg-white border-end-0 text-muted ps-3" style="border-color: #E2E8F0;">
+                            <i class="bi bi-key"></i>
+                        </span>
+                        <input type="password" name="password" class="form-control border-start-0 py-2.5" 
+                               placeholder="Masukkan kata sandi" style="border-color: #E2E8F0; font-size: 0.875rem;" 
+                               required>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-dark w-100 fw-bold">Masuk</button>
+
+                <button type="submit" class="btn btn-primary w-100 py-2.5 rounded-3 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2 mb-3" style="font-size: 0.875rem;">
+                    <i class="bi bi-box-arrow-in-right"></i> Masuk ke Sistem
+                </button>
+
+                <div class="text-center pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="/" class="text-decoration-none text-muted small fw-medium d-inline-flex align-items-center gap-1.5 hover-primary">
+                        <i class="bi bi-arrow-left"></i> Kembali ke Beranda Katalog
+                    </a>
+                </div>
             </form>
         </div>
     </div>

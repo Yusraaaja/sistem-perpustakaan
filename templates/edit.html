@@ -1,89 +1,200 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<div class="row justify-content-center mt-4">
-    <div class="col-md-8">
-        <div class="card shadow-sm border-0 rounded-3 p-4 mb-5">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <h4 class="fw-bold text-dark mb-0"><i class="bi bi-pencil-square text-primary"></i> Perbarui Manajemen Data Buku</h4>
-                <a href="{{ back_url if back_url else '/koleksi' }}" class="btn btn-sm btn-outline-secondary px-3">
+<div class="row justify-content-center mt-2 mb-5">
+    <div class="col-lg-10 col-xl-9">
+        <!-- Header & Navigation -->
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge rounded-pill fw-medium" style="background-color: #EEF2FF; color: #4F46E5; font-size: 0.75rem; padding: 4px 10px;">
+                        ID: {{ buku.id }}
+                    </span>
+                    <h4 class="page-title mb-0">Perbarui Data Buku</h4>
+                </div>
+                <p class="text-muted small mb-0">Pastikan data bibliografi dan kondisi fisik inventaris sinkron dengan kondisi riil di rak.</p>
+            </div>
+            
+            <div>
+                <a href="{{ back_url if back_url else '/koleksi' }}" class="btn btn-light border btn-sm px-3 py-2 fw-semibold text-secondary d-inline-flex align-items-center gap-1.5 rounded-3 shadow-xs" style="background-color: #FFFFFF; border-color: #E2E8F0 !important;">
                     <i class="bi bi-arrow-left"></i> Kembali
                 </a>
             </div>
-            <p class="text-muted small mb-4">Pastikan data katalog dan fisik inventaris sinkron dengan kondisi riil di rak.</p>
-            
-            <form action="/edit/{{ buku.id }}" method="POST">
-                <input type="hidden" name="back_url" value="{{ back_url }}">
-                
-                <h6 class="fw-bold text-primary text-uppercase small mb-3 border-bottom pb-2">I. Informasi Katalog Buku</h6>
-                <div class="row">
-                    <div class="col-md-12 mb-3">
-                        <label class="fw-bold small mb-1">Judul Utama Buku</label>
-                        <input type="text" name="judul" class="form-control form-control-sm" value="{{ buku.judul }}" required>
+        </div>
+
+        <form action="/edit/{{ buku.id }}" method="POST">
+            <input type="hidden" name="back_url" value="{{ back_url }}">
+
+            <!-- Bagian 1: Informasi Bibliografi & Katalog -->
+            <div class="card app-card border-0 shadow-sm rounded-4 p-4 mb-4">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: #F1F5F9 !important;">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background-color: #EEF2FF; color: #4F46E5;">
+                        <i class="bi bi-journal-text"></i>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="fw-bold small mb-1">Nama Penulis / Pengarang</label>
-                        <input type="text" name="penulis" class="form-control form-control-sm" value="{{ buku.penulis if buku.penulis else '' }}">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="fw-bold small mb-1">Penerbit</label>
-                        <input type="text" name="penerbit" class="form-control form-control-sm" value="{{ buku.penerbit if buku.penerbit else '' }}">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="fw-bold small mb-1">Tahun Terbit</label>
-                        <input type="text" name="tahun_terbit" class="form-control form-control-sm" value="{{ buku.tahun_terbit if buku.tahun_terbit else '' }}">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="fw-bold small mb-1">Nomor ISBN</label>
-                        <input type="text" name="isbn" class="form-control form-control-sm" value="{{ buku.isbn if buku.isbn else '' }}">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="fw-bold small mb-1">Kategori Buku</label>
-                        <input type="text" name="kategori" class="form-control form-control-sm" value="{{ buku.kategori if buku.kategori else '' }}">
-                    </div>
-                    <div class="col-12 mb-3">
-                        <label class="fw-bold small mb-1">Sinopsis Ringkas</label>
-                        <textarea name="sinopsis" class="form-control form-control-sm" rows="3">{{ buku.sinopsis if buku.sinopsis else '' }}</textarea>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0" style="font-size: 0.9375rem;">I. Informasi Bibliografi & Katalog</h6>
+                        <small class="text-muted" style="font-size: 0.75rem;">Metadata publik yang ditampilkan kepada pembaca pada katalog</small>
                     </div>
                 </div>
 
-                <h6 class="fw-bold text-success text-uppercase small mb-3 mt-3 border-bottom pb-2">II. Data Inventaris & Logistik Internal</h6>
-                
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="fw-bold small mb-1">No Registrasi</label>
-                        <input type="text" name="id_buku_fisik" class="form-control form-control-sm bg-light" value="{{ buku.id_buku_fisik }}" readonly>
-                        <small class="text-danger" style="font-size: 0.75rem;">* No Registrasi bersifat permanen & tidak dapat diubah.</small>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Judul Utama Buku <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" name="judul" class="form-control form-control-sm rounded-3 py-2 fw-semibold" 
+                               value="{{ buku.judul }}" style="border-color: #E2E8F0; font-size: 0.875rem;" required>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="fw-bold small mb-1">Kondisi Fisik Eksemplar</label>
-                        <select name="kondisi_buku" class="form-select form-select-sm">
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Sub Judul / Keterangan Tambahan
+                        </label>
+                        <input type="text" name="sub_judul" class="form-control form-control-sm rounded-3 py-2" 
+                               value="{{ buku.sub_judul if buku.sub_judul else '' }}" 
+                               placeholder="Contoh: Panduan Praktis Pemrograman Dasar" style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Nama Penulis / Pengarang
+                        </label>
+                        <input type="text" name="penulis" class="form-control form-control-sm rounded-3 py-2" 
+                               value="{{ buku.penulis if buku.penulis else '' }}" 
+                               placeholder="Nama pengarang buku" style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Penerbit
+                        </label>
+                        <input type="text" name="penerbit" class="form-control form-control-sm rounded-3 py-2" 
+                               value="{{ buku.penerbit if buku.penerbit else '' }}" 
+                               placeholder="Nama penerbit buku" style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Tahun Terbit
+                        </label>
+                        <input type="text" name="tahun_terbit" class="form-control form-control-sm rounded-3 py-2" 
+                               value="{{ buku.tahun_terbit if buku.tahun_terbit else '' }}" 
+                               placeholder="Contoh: 2024" style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Nomor ISBN
+                        </label>
+                        <input type="text" name="isbn" class="form-control form-control-sm rounded-3 py-2 font-monospace" 
+                               value="{{ buku.isbn if buku.isbn else '' }}" 
+                               placeholder="Contoh: 978-602-000-000-0" style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Kategori Buku
+                        </label>
+                        <input type="text" name="kategori" class="form-control form-control-sm rounded-3 py-2" 
+                               value="{{ buku.kategori if buku.kategori else '' }}" 
+                               placeholder="Contoh: Komputer, Fiksi" style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Sinopsis Ringkas
+                        </label>
+                        <textarea name="sinopsis" class="form-control form-control-sm rounded-3 p-2.5" rows="3" 
+                                  placeholder="Ringkasan atau ikhtisar isi buku..." 
+                                  style="border-color: #E2E8F0; font-size: 0.8125rem;">{{ buku.sinopsis if buku.sinopsis else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bagian 2: Data Inventaris & Logistik Fisik -->
+            <div class="card app-card border-0 shadow-sm rounded-4 p-4 mb-4">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: #F1F5F9 !important;">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background-color: #ECFDF5; color: #059669;">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0" style="font-size: 0.9375rem;">II. Data Inventaris & Logistik Internal</h6>
+                        <small class="text-muted" style="font-size: 0.75rem;">Pengaturan fisik eksemplar, stok, harga ganti rugi, dan lokasi rak</small>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Nomor Registrasi Fisik
+                        </label>
+                        <input type="text" name="id_buku_fisik" class="form-control form-control-sm rounded-3 py-2 font-monospace" 
+                               value="{{ buku.id_buku_fisik }}" style="background-color: #F8FAFC; border-color: #E2E8F0; font-size: 0.8125rem;" readonly>
+                        <div class="d-flex align-items-center gap-1 text-muted mt-1" style="font-size: 0.72rem;">
+                            <i class="bi bi-lock-fill text-secondary"></i>
+                            <span>No Registrasi bersifat permanen dan tersinkronisasi otomatis dengan eksemplar.</span>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Kondisi Fisik Eksemplar
+                        </label>
+                        <select name="kondisi_buku" class="form-select form-select-sm rounded-3 py-2" style="border-color: #E2E8F0; font-size: 0.8125rem;">
                             <option value="Baik" {{ 'selected' if buku.kondisi_buku == 'Baik' else '' }}>Kondisi Baik / Layak Pinjam</option>
                             <option value="Rusak" {{ 'selected' if buku.kondisi_buku == 'Rusak' else '' }}>Rusak (Butuh Perbaikan)</option>
                             <option value="Hilang" {{ 'selected' if buku.kondisi_buku == 'Hilang' else '' }}>Hilang / Masa Ganti Rugi</option>
                         </select>
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="fw-bold small mb-1">Lokasi Kode Rak</label>
-                        <input type="text" name="lokasi_rak" class="form-control form-control-sm" value="{{ buku.lokasi_rak if buku.lokasi_rak else '' }}" placeholder="Contoh: Rak A-1">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="fw-bold small mb-1">Harga Buku Asli (Rp)</label>
-                        <input type="number" name="harga_buku" class="form-control form-control-sm" value="{{ buku.harga_buku if buku.harga_buku else 0 }}" placeholder="Untuk denda Opsi A">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="fw-bold small mb-1">Jumlah Stok Fisik</label>
-                        <input type="number" name="stok" class="form-control form-control-sm" value="{{ buku.stok }}" readonly>
-                        <small class="text-danger" style="font-size: 0.75rem;">* Jumlah Stok bersifat permanen & tidak dapat diubah karena sinkron dengan jumlah <strong>No Registrasi</strong>.</small>
-                    </div>
-                </div>
 
-                <div class="d-flex gap-2 mt-4 pt-3 border-top">
-                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm">Simpan Perubahan</button>
-                    <a href="{{ back_url if back_url else '/koleksi' }}" class="btn btn-outline-secondary btn-sm px-4">Batal</a>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Lokasi Kode Rak
+                        </label>
+                        <input type="text" name="lokasi_rak" class="form-control form-control-sm rounded-3 py-2" 
+                               value="{{ buku.lokasi_rak if buku.lokasi_rak else '' }}" 
+                               placeholder="Contoh: Rak A-1" style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Harga Buku Asli (Rp)
+                        </label>
+                        <input type="number" name="harga_buku" class="form-control form-control-sm rounded-3 py-2" 
+                               value="{{ buku.harga_buku if buku.harga_buku else 0 }}" 
+                               placeholder="Contoh: 125000" style="border-color: #E2E8F0; font-size: 0.8125rem;">
+                        <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">Acuan nominal denda ganti rugi jika buku hilang/rusak.</small>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1.5 text-dark">
+                            Jumlah Stok Fisik
+                        </label>
+                        <input type="number" name="stok" class="form-control form-control-sm rounded-3 py-2" 
+                               value="{{ buku.stok }}" style="background-color: #F8FAFC; border-color: #E2E8F0; font-size: 0.8125rem;" readonly>
+                        <div class="d-flex align-items-center gap-1 text-muted mt-1" style="font-size: 0.72rem;">
+                            <i class="bi bi-lock-fill text-secondary"></i>
+                            <span>Stok terhubung langsung dengan ketersediaan eksemplar di rak.</span>
+                        </div>
+                    </div>
                 </div>
-            </form>
-        </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="card app-card border-0 shadow-sm rounded-4 p-3 d-flex flex-row justify-content-between align-items-center">
+                <div class="text-muted small">
+                    <i class="bi bi-shield-check me-1 text-success"></i> Perubahan akan segera tercatat di katalog dan log sirkulasi.
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ back_url if back_url else '/koleksi' }}" class="btn btn-light border btn-sm px-3.5 py-2 fw-semibold rounded-3 text-secondary" style="background-color: #FFFFFF; border-color: #E2E8F0 !important;">
+                        Batal
+                    </a>
+                    <button type="submit" class="btn btn-primary btn-sm px-4 py-2 fw-semibold rounded-3 shadow-sm d-inline-flex align-items-center gap-2">
+                        <i class="bi bi-check2-circle"></i> Simpan Perubahan
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
