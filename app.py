@@ -219,6 +219,103 @@ def search_redirect():
     query = request.args.get('query', '').strip()
     return redirect(url_for('koleksi_lengkap', query=query))
 
+@app.route('/api/search_suggestions')
+def api_search_suggestions():
+    """
+    Endpoint Cerdas Pencarian Katalog Buku (Smart Search API):
+    Mendukung Live Autocomplete, Title/Author Matching, dan Partial ID Matching.
+    Hanya mengembalikan data publik katalog (Zero Data PII Leak).
+    """
+    q = (request.args.get('q') or request.args.get('query') or '').strip()
+    if not q:
+        return jsonify([])
+
+    # Batasi panjang query untuk mencegah abuse
+    if len(q) > 100:
+        q = q[:100]
+
+    q_lower = q.lower()
+
+    conn = get_db_connection()
+    try:
+        rows = conn.execute('''
+            SELECT id, judul, sub_judul, penulis, penerbit, kategori, cover_img, id_buku_fisik
+            FROM buku
+            WHERE judul LIKE ? OR penulis LIKE ? OR id_buku_fisik LIKE ?
+            ORDER BY id DESC
+            LIMIT 20
+        ''', (f'%{q}%', f'%{q}%', f'%{q}%')).fetchall()
+    except sqlite3.Error:
+        rows = []
+    finally:
+        conn.close()
+
+    results = []
+    for row in rows:
+        judul = row['judul'] or ''
+        sub_judul = row['sub_judul'] or ''
+        penulis = row['penulis'] or ''
+        kategori = row['kategori'] or ''
+        cover_img = row['cover_img']
+        id_buku_fisik_raw = row['id_buku_fisik']
+
+        # Ekstraksi dan evaluasi nomor registrasi fisik untuk Partial ID Matching
+        reg_list = parse_registration_numbers(id_buku_fisik_raw)
+        matched_id = None
+        match_type = 'title'
+
+        # Cari nomor registrasi spesifik yang cocok dengan query
+        for reg in reg_list:
+            if q_lower in reg.lower():
+                matched_id = reg
+                match_type = 'id'
+                break
+
+        if not matched_id:
+            if q_lower in judul.lower():
+                match_type = 'title'
+            elif q_lower in penulis.lower():
+                match_type = 'author'
+            elif q_lower in sub_judul.lower():
+                match_type = 'subtitle'
+            else:
+                match_type = 'general'
+
+        cover_url = None
+        if cover_img:
+            cover_url = url_for('static', filename=f'covers/{cover_img}')
+
+        results.append({
+            'id': row['id'],
+            'judul': judul,
+            'sub_judul': sub_judul,
+            'penulis': penulis,
+            'kategori': kategori,
+            'cover_url': cover_url,
+            'matched_id': matched_id,
+            'match_type': match_type
+        })
+
+    # Prioritaskan relevansi: exact ID match -> partial ID match -> title prefix -> title general -> author
+    def sort_priority(item):
+        m = item['match_type']
+        if m == 'id':
+            if item['matched_id'] and item['matched_id'].lower() == q_lower:
+                return 0
+            return 1
+        elif m == 'title':
+            if item['judul'].lower().startswith(q_lower):
+                return 2
+            return 3
+        elif m == 'author':
+            return 4
+        return 5
+
+    results.sort(key=sort_priority)
+
+    # Batasi respons maksimal 8 item terbaik
+    return jsonify(results[:8])
+
 @app.route('/add', methods=['POST'])
 def tambah_buku():
     if not session.get('logged_in'):

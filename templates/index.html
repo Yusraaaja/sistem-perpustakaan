@@ -8,6 +8,11 @@
         <input type="text" name="query" class="form-control me-2 shadow-sm" 
                placeholder="Ketik judul buku atau penulis..." 
                value="{{ query or '' }}" required>
+        <div class="position-relative flex-grow-1 me-2 smart-search-wrapper">
+            <input type="text" name="query" class="form-control shadow-sm smart-search-input" 
+                   placeholder="Ketik judul buku, nama penulis, atau ID buku fisik..." 
+                   value="{{ query or '' }}" required autocomplete="off">
+        </div>
         <button type="submit" class="btn btn-primary px-4 shadow-sm">
             <i class="bi bi-search"></i> Cari
         </button>

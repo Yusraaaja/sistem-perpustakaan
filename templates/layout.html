@@ -218,6 +218,170 @@
             border-radius: 14px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         }
+
+        /* Smart Search Autocomplete Component */
+        .smart-search-wrapper {
+            position: relative;
+        }
+
+        .smart-search-dropdown {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            min-width: 300px;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+            z-index: 1060;
+            overflow: hidden;
+            display: none;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        .smart-search-dropdown.show {
+            display: block;
+        }
+
+        .smart-search-header {
+            padding: 8px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748B;
+            background-color: #F8FAFC;
+            border-bottom: 1px solid #F1F5F9;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .smart-search-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            text-decoration: none;
+            color: #0F172A;
+            border-bottom: 1px solid #F8FAFC;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .smart-search-item:last-child {
+            border-bottom: none;
+        }
+
+        .smart-search-item:hover,
+        .smart-search-item.active {
+            background-color: #F1F5F9;
+        }
+
+        .smart-search-item.active {
+            outline: none;
+            border-left: 3px solid #4F46E5;
+        }
+
+        .smart-search-thumb {
+            width: 36px;
+            height: 48px;
+            border-radius: 6px;
+            background-color: #EEF2FF;
+            color: #4F46E5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            border: 1px solid #E2E8F0;
+        }
+
+        .smart-search-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .smart-search-content {
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .smart-search-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #0F172A;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .smart-search-meta {
+            font-size: 0.75rem;
+            color: #64748B;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .smart-search-history-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 9px 14px;
+            color: #334155;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .smart-search-history-item:hover,
+        .smart-search-history-item.active {
+            background-color: #F8FAFC;
+            color: #4F46E5;
+        }
+
+        .smart-search-history-item.active {
+            border-left: 3px solid #4F46E5;
+        }
+
+        .smart-search-footer {
+            padding: 9px 14px;
+            background-color: #F8FAFC;
+            border-top: 1px solid #F1F5F9;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #4F46E5;
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.15s ease;
+        }
+
+        .smart-search-footer:hover,
+        .smart-search-footer.active {
+            background-color: #EEF2FF;
+        }
+
+        .smart-search-empty {
+            padding: 20px 14px;
+            text-align: center;
+            color: #64748B;
+            font-size: 0.85rem;
+        }
+
+        @media (min-width: 768px) {
+            form[action="/koleksi"] .smart-search-dropdown {
+                left: auto;
+                right: 0;
+                width: 360px;
+                max-width: 90vw;
+            }
+        }
     </style>
 </head>
 <body>
@@ -280,6 +444,339 @@
     Fancybox.bind("[data-fancybox]", {
         // Opsi tambahan (bisa dikosongkan)
     });
+
+    // =========================================================================
+    // FEATURE 5.1 — SMART SEARCH ENGINE (Suggestions, History & Partial ID Match)
+    // =========================================================================
+    (function() {
+        const STORAGE_KEY = 'eperpus_search_history';
+        const MAX_HISTORY = 6;
+
+        function getSearchHistory() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveSearchTerm(term) {
+            if (!term || !term.trim()) return;
+            term = term.trim();
+            try {
+                let history = getSearchHistory();
+                history = history.filter(item => item.toLowerCase() !== term.toLowerCase());
+                history.unshift(term);
+                if (history.length > MAX_HISTORY) {
+                    history = history.slice(0, MAX_HISTORY);
+                }
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+            } catch (e) {
+                console.warn('Gagal menyimpan search history:', e);
+            }
+        }
+
+        function clearSearchHistory() {
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+            } catch (e) {
+                console.warn('Gagal menghapus search history:', e);
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function initSmartSearch(input) {
+            const form = input.closest('form');
+            const wrapper = input.closest('.smart-search-wrapper') || input.parentElement;
+            if (!wrapper) return;
+
+            if (!wrapper.style.position || wrapper.style.position === 'static') {
+                wrapper.style.position = 'relative';
+            }
+
+            // Buat kontainer dropdown
+            const dropdown = document.createElement('div');
+            dropdown.className = 'smart-search-dropdown shadow-lg';
+            wrapper.appendChild(dropdown);
+
+            let debounceTimer = null;
+            let activeIndex = -1;
+            let currentItems = [];
+
+            if (form) {
+                form.addEventListener('submit', function() {
+                    const q = input.value.trim();
+                    if (q) {
+                        saveSearchTerm(q);
+                    }
+                });
+            }
+
+            function closeDropdown() {
+                dropdown.classList.remove('show');
+                dropdown.innerHTML = '';
+                activeIndex = -1;
+                currentItems = [];
+            }
+
+            function setActiveItem(index) {
+                currentItems.forEach(el => el.classList.remove('active'));
+                if (index >= 0 && index < currentItems.length) {
+                    activeIndex = index;
+                    currentItems[index].classList.add('active');
+                    currentItems[index].scrollIntoView({ block: 'nearest' });
+                } else {
+                    activeIndex = -1;
+                }
+            }
+
+            function renderHistory() {
+                const history = getSearchHistory();
+                if (history.length === 0) {
+                    closeDropdown();
+                    return;
+                }
+
+                dropdown.innerHTML = '';
+                activeIndex = -1;
+                currentItems = [];
+
+                // Header Riwayat
+                const header = document.createElement('div');
+                header.className = 'smart-search-header';
+                header.innerHTML = `
+                    <span><i class="bi bi-clock-history me-1"></i> Riwayat Pencarian</span>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-danger text-decoration-none fw-semibold smart-search-clear-btn" style="font-size: 0.75rem;">
+                        Hapus riwayat
+                    </button>
+                `;
+                dropdown.appendChild(header);
+
+                header.querySelector('.smart-search-clear-btn').addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    clearSearchHistory();
+                    closeDropdown();
+                    input.focus();
+                });
+
+                // Daftar item riwayat
+                history.forEach(term => {
+                    const item = document.createElement('div');
+                    item.className = 'smart-search-history-item';
+                    item.innerHTML = `
+                        <div class="d-flex align-items-center gap-2 text-truncate">
+                            <i class="bi bi-search text-muted small"></i>
+                            <span class="text-truncate">${escapeHtml(term)}</span>
+                        </div>
+                        <i class="bi bi-arrow-up-left text-muted small opacity-50"></i>
+                    `;
+
+                    item.addEventListener('mousedown', function(e) {
+                        e.preventDefault();
+                    });
+
+                    item.addEventListener('click', function() {
+                        input.value = term;
+                        saveSearchTerm(term);
+                        closeDropdown();
+                        if (form) {
+                            form.submit();
+                        } else {
+                            window.location.href = `/koleksi?query=${encodeURIComponent(term)}`;
+                        }
+                    });
+
+                    dropdown.appendChild(item);
+                    currentItems.push(item);
+                });
+
+                dropdown.classList.add('show');
+            }
+
+            function renderSuggestions(query, results) {
+                dropdown.innerHTML = '';
+                activeIndex = -1;
+                currentItems = [];
+
+                if (!results || results.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'smart-search-empty';
+                    empty.innerHTML = `
+                        <i class="bi bi-journal-x fs-4 d-block mb-1 text-muted"></i>
+                        <div>Tidak ada buku ditemukan untuk "<strong>${escapeHtml(query)}</strong>"</div>
+                        <small class="text-muted">Gunakan kata kunci judul, nama penulis, atau ID fisik buku lainnya</small>
+                    `;
+                    dropdown.appendChild(empty);
+                    dropdown.classList.add('show');
+                    return;
+                }
+
+                // Header Sugesti
+                const header = document.createElement('div');
+                header.className = 'smart-search-header';
+                header.innerHTML = `<span><i class="bi bi-lightning-charge me-1 text-primary"></i> Sugesti Buku (${results.length})</span>`;
+                dropdown.appendChild(header);
+
+                // Daftar item buku
+                results.forEach(book => {
+                    const item = document.createElement('div');
+                    item.className = 'smart-search-item';
+
+                    let thumbHtml = '';
+                    if (book.cover_url) {
+                        thumbHtml = `<img src="${escapeHtml(book.cover_url)}" alt="Cover" loading="lazy">`;
+                    } else {
+                        thumbHtml = `<i class="bi bi-book fs-5"></i>`;
+                    }
+
+                    let badgeIdHtml = '';
+                    if (book.matched_id) {
+                        badgeIdHtml = `<span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5" style="font-size: 0.7rem;"><i class="bi bi-upc-scan me-1"></i>ID: ${escapeHtml(book.matched_id)}</span>`;
+                    }
+
+                    let categoryBadge = book.kategori ? `<span class="badge rounded-pill bg-light text-secondary border px-2 py-0.5" style="font-size: 0.7rem;">${escapeHtml(book.kategori)}</span>` : '';
+
+                    item.innerHTML = `
+                        <div class="smart-search-thumb">${thumbHtml}</div>
+                        <div class="smart-search-content">
+                            <div class="smart-search-title">${escapeHtml(book.judul)}</div>
+                            <div class="smart-search-meta">
+                                ${book.penulis ? `<span class="text-muted"><i class="bi bi-person me-1"></i>${escapeHtml(book.penulis)}</span>` : ''}
+                                ${badgeIdHtml}
+                                ${categoryBadge}
+                            </div>
+                        </div>
+                    `;
+
+                    item.addEventListener('mousedown', function(e) {
+                        e.preventDefault();
+                    });
+
+                    item.addEventListener('click', function() {
+                        saveSearchTerm(book.judul);
+                        window.location.href = `/buku/${book.id}`;
+                    });
+
+                    dropdown.appendChild(item);
+                    currentItems.push(item);
+                });
+
+                // Footer: Cari semua hasil di katalog
+                const footer = document.createElement('div');
+                footer.className = 'smart-search-footer';
+                footer.innerHTML = `
+                    <i class="bi bi-arrow-right-circle me-1"></i> Lihat semua hasil pencarian "<strong>${escapeHtml(query)}</strong>" di katalog &rarr;
+                `;
+                footer.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                });
+                footer.addEventListener('click', function() {
+                    saveSearchTerm(query);
+                    if (form) {
+                        form.submit();
+                    } else {
+                        window.location.href = `/koleksi?query=${encodeURIComponent(query)}`;
+                    }
+                });
+                dropdown.appendChild(footer);
+                currentItems.push(footer);
+
+                dropdown.classList.add('show');
+            }
+
+            function fetchSuggestions(query) {
+                fetch(`/api/search_suggestions?q=${encodeURIComponent(query)}`)
+                    .then(res => {
+                        if (!res.ok) throw new Error('API response not ok');
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (input.value.trim() === query) {
+                            renderSuggestions(query, data);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('SmartSearch fetch error:', err);
+                    });
+            }
+
+            // Event Listeners
+            input.addEventListener('input', function() {
+                const val = this.value.trim();
+                clearTimeout(debounceTimer);
+
+                if (!val) {
+                    renderHistory();
+                    return;
+                }
+
+                debounceTimer = setTimeout(() => {
+                    fetchSuggestions(val);
+                }, 250);
+            });
+
+            input.addEventListener('focus', function() {
+                const val = this.value.trim();
+                if (!val) {
+                    renderHistory();
+                } else if (dropdown.innerHTML && !dropdown.classList.contains('show')) {
+                    dropdown.classList.add('show');
+                } else {
+                    fetchSuggestions(val);
+                }
+            });
+
+            input.addEventListener('keydown', function(e) {
+                if (!dropdown.classList.contains('show') || currentItems.length === 0) {
+                    if (e.key === 'ArrowDown' && !this.value.trim()) {
+                        renderHistory();
+                    }
+                    return;
+                }
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const nextIndex = activeIndex < currentItems.length - 1 ? activeIndex + 1 : 0;
+                    setActiveItem(nextIndex);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prevIndex = activeIndex > 0 ? activeIndex - 1 : currentItems.length - 1;
+                    setActiveItem(prevIndex);
+                } else if (e.key === 'Enter') {
+                    if (activeIndex >= 0 && activeIndex < currentItems.length) {
+                        e.preventDefault();
+                        currentItems[activeIndex].click();
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeDropdown();
+                }
+            });
+
+            // Tutup jika klik di luar
+            document.addEventListener('click', function(e) {
+                if (!wrapper.contains(e.target)) {
+                    closeDropdown();
+                }
+            });
+        }
+
+        // Inisialisasi otomatis pada seluruh input query di seluruh aplikasi
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInputs = document.querySelectorAll('input[name="query"], .smart-search-input');
+            searchInputs.forEach(input => initSmartSearch(input));
+        });
+    })();
 </script>
 </body>
-</html>
+</html>
