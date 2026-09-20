@@ -201,6 +201,7 @@
                                     {% if p.status == 'Dipinjam' %}
                                     <div class="d-flex flex-column gap-2 mb-3">
                                         <form action="/kembalikan/{{ p.id }}" method="POST">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                             <input type="hidden" name="status_kembali" value="Kembali">
                                             <button type="submit" class="btn btn-success btn-sm w-100 fw-semibold py-2 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2">
                                                 <i class="bi bi-check-circle-fill"></i> Konfirmasi Pengembalian (Normal)
@@ -208,6 +209,7 @@
                                         </form>
                                         
                                         <form action="/kembalikan/{{ p.id }}" method="POST" onsubmit="return confirm('Konfirmasi pengembalian dengan status buku RUSAK? Denda seharga buku akan diterapkan.');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                             <input type="hidden" name="status_kembali" value="Rusak">
                                             <button type="submit" class="btn btn-sm w-100 fw-semibold py-2 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2"
                                                     style="background-color: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;">
@@ -216,6 +218,7 @@
                                         </form>
                                         
                                         <form action="/kembalikan/{{ p.id }}" method="POST" onsubmit="return confirm('Apakah Anda yakin menyatakan buku ini HILANG? Ganti rugi seharga buku akan dibebankan.');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                             <input type="hidden" name="status_kembali" value="Hilang">
                                             <button type="submit" class="btn btn-sm w-100 fw-semibold py-2 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2"
                                                     style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FECACA;">
@@ -224,6 +227,7 @@
                                         </form>
 
                                         <form action="/lunasi_denda/{{ p.id }}" method="POST" onsubmit="return confirm('Apakah denda transaksi peminjaman ini sudah diselesaikan/lunas?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                             <button type="submit" class="btn btn-sm w-100 fw-semibold py-2 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2"
                                                     style="background-color: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE;">
                                                 <i class="bi bi-cash-coin"></i> Selesaikan & Lunasi Denda
@@ -233,6 +237,7 @@
                                     {% elif p.status in ['Rusak', 'Hilang'] %}
                                     <div class="mb-3">
                                         <form action="/lunasi_denda/{{ p.id }}" method="POST" onsubmit="return confirm('Apakah denda ganti rugi buku ini sudah diselesaikan/lunas?');" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                             <button type="submit" class="btn btn-success btn-sm fw-semibold py-2 w-100 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2">
                                                 <i class="bi bi-check-circle-fill"></i> Konfirmasi Denda Dibayar / Lunas
                                             </button>
@@ -247,6 +252,7 @@
                                     <hr class="my-3" style="border-color: #E2E8F0;">
                                     
                                     <form action="/hapus_peminjaman/{{ p.id }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus log transaksi ini dari riwayat secara permanen?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger w-100 py-2 rounded-3 fw-medium d-flex align-items-center justify-content-center gap-2">
                                             <i class="bi bi-trash3"></i> Hapus Permanen Log Riwayat
                                         </button>
@@ -287,6 +293,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="/proses_pinjam_admin" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label fw-semibold small mb-1.5 text-dark">Nomor Registrasi Buku Fisik <span class="text-danger">*</span></label>

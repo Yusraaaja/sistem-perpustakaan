@@ -1,35 +1,154 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file, abort
 import sqlite3
 from datetime import datetime, timedelta
 import os
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
 import json
 from io import BytesIO
+import secrets
+import hmac
+
+# ==============================================================================
+# ENVIRONMENT & SECURITY CONFIGURATION
+# ==============================================================================
+
+# Load environment variables dari .env jika tersedia (zero external dependency)
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(_env_path):
+    try:
+        with open(_env_path, 'r', encoding='utf-8') as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith('#') and '=' in _line:
+                    _k, _v = _line.split('=', 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+    except Exception:
+        pass
 
 app = Flask(__name__)
-# Konfigurasi Keamanan Aplikasi (Satu Secret Key yang Valid)
-app.secret_key = 'supersecretkey_pilihan_aman'
 
-# Konfigurasi Unggahan File Aset Media
+# Konfigurasi Keamanan Aplikasi (Environment Variable dengan Dynamic Secure Fallback)
+_env_secret = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET_KEY')
+if _env_secret:
+    app.secret_key = _env_secret
+else:
+    # Menggunakan kunci acak kuat jika tidak disetel di environment
+    app.secret_key = secrets.token_hex(32)
+
+# Konfigurasi Unggahan File Aset Media & Batasan Ukuran Payload (2MB Max)
 UPLOAD_FOLDER = 'static/covers'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_MIMETYPES = {'image/png', 'image/jpeg', 'image/gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Pastikan infrastruktur folder media tersedia
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2MB Maksimum Payload
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Kredensial Akses Administratif (Simulasi Otentikasi)
-ADMIN_USERNAME = 'admin'
-ADMIN_PASSWORD = '123' 
+# Kredensial Akses Administratif (Keamanan Hash & Zero Plaintext in Source)
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
 
-# ==========================================
-# HELPER FUNCTIONS (Optimalisasi & Standarisasi Data)
-# ==========================================
+# Precomputed scrypt hash untuk default password '123'
+# Menjamin tidak ada password plaintext yang tersimpan di source code
+_DEFAULT_ADMIN_HASH = 'scrypt:32768:8:1$ctkS8AJtLTUe5TUJ$9639ada107cd1214544ce1625d09da644c0fd43f825a7adb387d45566c5a20ec11a5c6c96770569d9e782c2c9603843d2077deb45bee2c6125cba24fccdc127b'
+
+_env_admin_hash = os.environ.get('ADMIN_PASSWORD_HASH')
+_env_admin_pwd = os.environ.get('ADMIN_PASSWORD')
+
+if _env_admin_hash:
+    ADMIN_PASSWORD_HASH = _env_admin_hash
+elif _env_admin_pwd:
+    ADMIN_PASSWORD_HASH = generate_password_hash(_env_admin_pwd)
+else:
+    ADMIN_PASSWORD_HASH = _DEFAULT_ADMIN_HASH
+
+# ==============================================================================
+# CSRF PROTECTION ENGINE (Synchronizer Token Pattern)
+# ==============================================================================
+
+@app.context_processor
+def inject_csrf_token():
+    """Injeksi token CSRF ke seluruh template Jinja secara otomatis."""
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = secrets.token_hex(32)
+    return {'csrf_token': session['_csrf_token']}
+
+@app.before_request
+def verify_csrf():
+    """Verifikasi token CSRF pada seluruh permintaan yang memutasi state (POST, PUT, DELETE, PATCH)."""
+    if request.method in ('POST', 'PUT', 'DELETE', 'PATCH'):
+        session_token = session.get('_csrf_token')
+        request_token = request.form.get('csrf_token') or request.headers.get('X-CSRFToken')
+
+        if not session_token or not request_token or not hmac.compare_digest(session_token, request_token):
+            abort(400, description="Validasi CSRF Token Gagal. Permintaan ditolak untuk alasan keamanan.")
+
+# ==============================================================================
+# CUSTOM ERROR HANDLERS (Tanpa Bocoran Traceback/Internal Path)
+# ==============================================================================
+
+@app.errorhandler(400)
+def bad_request(error):
+    desc = getattr(error, 'description', 'Permintaan tidak valid atau token keamanan kadaluarsa.')
+    return render_template('error.html', error_code=400, error_title="Permintaan Tidak Valid (Bad Request)", error_message=desc), 400
+
+@app.errorhandler(404)
+def not_found(error):
+    return render_template('error.html', error_code=404, error_title="Halaman Tidak Ditemukan", error_message="Halaman atau sumber daya yang Anda tuju tidak ditemukan."), 404
+
+@app.errorhandler(405)
+def method_not_allowed(error):
+    return render_template('error.html', error_code=405, error_title="Metode HTTP Tidak Diizinkan", error_message="Metode permintaan HTTP yang digunakan tidak diizinkan untuk endpoint ini."), 405
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    return render_template('error.html', error_code=413, error_title="Ukuran Berkas Terlalu Besar", error_message="Ukuran berkas yang Anda unggah melebihi batas maksimum sistem (Maksimal 2 MB)."), 413
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    return render_template('error.html', error_code=500, error_title="Kesalahan Internal Server", error_message="Terjadi kendala pada sistem internal server. Silakan hubungi staf administrator."), 500
+
+# ==============================================================================
+# HELPER FUNCTIONS (Optimalisasi, Standarisasi Data & Keamanan)
+# ==============================================================================
 
 def allowed_file(filename):
     """Validasi ekstensi file cover yang diunggah."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def validate_image_file(file_storage):
+    """
+    Validasi menyeluruh file cover buku:
+    1. Ekstensi file
+    2. MIME type
+    3. Magic bytes / header biner asli (PNG, JPEG, GIF)
+    """
+    if not file_storage or not file_storage.filename:
+        return False, "File tidak valid atau tidak dipilih."
+
+    filename = file_storage.filename
+    if not ('.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS):
+        return False, "Ekstensi file tidak diizinkan. Hanya PNG, JPG, JPEG, GIF."
+
+    if file_storage.content_type and file_storage.content_type.lower() not in ALLOWED_MIMETYPES:
+        return False, "MIME type file tidak sesuai dengan gambar yang diizinkan."
+
+    try:
+        header = file_storage.read(16)
+        file_storage.seek(0)
+        if not header:
+            return False, "File kosong."
+
+        is_png = header.startswith(b'\x89PNG\r\n\x1a\n')
+        is_jpeg = header.startswith(b'\xff\xd8\xff')
+        is_gif = header.startswith(b'GIF87a') or header.startswith(b'GIF89a')
+
+        if not (is_png or is_jpeg or is_gif):
+            return False, "Konten biner file bukan gambar yang valid (Magic Byte verification failed)."
+    except Exception as e:
+        return False, f"Gagal memvalidasi header file: {str(e)}"
+
+    return True, ""
 
 def get_db_connection():
     """Mengelola koneksi database SQLite dengan factory row."""
@@ -72,7 +191,7 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        if username == ADMIN_USERNAME and check_password_hash(ADMIN_PASSWORD_HASH, password or ''):
             session['logged_in'] = True
             flash('Selamat datang, Admin!', 'success')
             return redirect(url_for('koleksi_lengkap'))
@@ -133,12 +252,21 @@ def tambah_buku():
     except (ValueError, TypeError):
         harga_buku = 0
 
-    # 3. Pemrosesan Unggah Cover Buku
+    # 3. Pemrosesan Unggah Cover Buku dengan Validasi Magic Bytes & Path Guard
     file = request.files.get('cover_img')
     filename = None
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    if file and file.filename:
+        is_valid, err_msg = validate_image_file(file)
+        if is_valid:
+            safe_name = secure_filename(file.filename)
+            unique_filename = f"cover_{int(datetime.now().timestamp())}_{safe_name}"
+            target_path = os.path.abspath(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+            upload_dir = os.path.abspath(app.config['UPLOAD_FOLDER'])
+            if target_path.startswith(upload_dir):
+                file.save(target_path)
+                filename = unique_filename
+        else:
+            flash(f'Peringatan upload cover: {err_msg}', 'warning')
     
     # 4. Transaksi Persistensi Database
     conn = get_db_connection()
@@ -219,7 +347,7 @@ def edit_buku(id):
             
         return redirect(back_url_post)
 
-@app.route('/delete/<int:id>')
+@app.route('/delete/<int:id>', methods=['POST'])
 def hapus_buku(id):
     if not session.get('logged_in'):
         flash('Silakan login terlebih dahulu!', 'danger')
@@ -247,7 +375,7 @@ def detail_buku(id):
     
     if buku_row is None:
         conn.close()
-        return "Buku tidak ditemukan", 404
+        abort(404)
         
     buku = dict(buku_row)
 
@@ -315,23 +443,30 @@ def upload_cover(id):
         return redirect(url_for('detail_buku', id=id))
     
     file = request.files['cover_file']
-    if file.filename == '':
+    if not file or file.filename == '':
         flash('Tidak ada file yang dipilih', 'danger')
         return redirect(url_for('detail_buku', id=id))
     
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        unique_filename = f"buku_{id}_{filename}"
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+    is_valid, err_msg = validate_image_file(file)
+    if is_valid:
+        safe_name = secure_filename(file.filename)
+        unique_filename = f"buku_{id}_{int(datetime.now().timestamp())}_{safe_name}"
+        target_path = os.path.abspath(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+        upload_dir = os.path.abspath(app.config['UPLOAD_FOLDER'])
         
-        conn = get_db_connection()
-        conn.execute('UPDATE buku SET cover_img = ? WHERE id = ?', (unique_filename, id))
-        conn.commit()
-        conn.close()
-        
-        flash('Cover buku berhasil diunggah!', 'success')
+        if target_path.startswith(upload_dir):
+            file.save(target_path)
+            
+            conn = get_db_connection()
+            conn.execute('UPDATE buku SET cover_img = ? WHERE id = ?', (unique_filename, id))
+            conn.commit()
+            conn.close()
+            
+            flash('Cover buku berhasil diunggah!', 'success')
+        else:
+            flash('Kesalahan keamanan path penyimpanan file!', 'danger')
     else:
-        flash('Tipe file tidak diizinkan.', 'danger')
+        flash(f'Tipe file tidak diizinkan: {err_msg}', 'danger')
         
     return redirect(url_for('detail_buku', id=id))
 
@@ -556,6 +691,12 @@ def hapus_peminjaman(id):
 
 @app.route('/api/riwayat_buku/<int:buku_id>')
 def api_riwayat_buku(buku_id):
+    if not session.get('logged_in'):
+        return jsonify({
+            'error': 'Unauthorized',
+            'message': 'Akses riwayat sirkulasi dibatasi hanya untuk staf perpustakaan yang terotentikasi.'
+        }), 401
+
     conn = get_db_connection()
     riwayat = conn.execute('''
         SELECT id_anggota, kelas, jurusan, tgl_pinjam, tgl_dikembalikan, status, denda 

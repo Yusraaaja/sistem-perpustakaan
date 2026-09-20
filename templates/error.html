@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-7 col-lg-5 text-center">
+        <div class="card app-card border-0 shadow-sm p-4 p-md-5">
+            <div class="mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 72px; height: 72px; background-color: #FEF2F2; color: #DC2626;">
+                    {% if error_code == 404 %}
+                        <i class="bi bi-compass fs-1 text-primary" style="color: #4F46E5 !important;"></i>
+                    {% elif error_code == 400 %}
+                        <i class="bi bi-shield-x fs-1 text-danger"></i>
+                    {% elif error_code == 413 %}
+                        <i class="bi bi-file-earmark-arrow-up fs-1 text-warning" style="color: #D97706 !important;"></i>
+                    {% else %}
+                        <i class="bi bi-exclamation-triangle fs-1 text-danger"></i>
+                    {% endif %}
+                </div>
+                <h1 class="display-6 fw-bold text-dark mb-1">{{ error_code }}</h1>
+                <h5 class="fw-semibold text-secondary mb-2">{{ error_title or 'Terjadi Kendala Teknis' }}</h5>
+                <p class="text-muted small mb-4" style="line-height: 1.6;">
+                    {{ error_message or 'Permintaan Anda tidak dapat diproses saat ini. Silakan coba kembali beberapa saat lagi.' }}
+                </p>
+            </div>
+            <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                <a href="{{ url_for('koleksi_lengkap') }}" class="btn btn-primary btn-sm px-4 py-2 rounded-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-xs">
+                    <i class="bi bi-grid-fill"></i> Buka Katalog
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm px-4 py-2 rounded-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5" style="border-color: #CBD5E1;">
+                    <i class="bi bi-house-door"></i> Ke Beranda
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

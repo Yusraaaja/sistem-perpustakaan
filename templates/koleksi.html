@@ -19,6 +19,7 @@
             </button>
             
             <form action="/reset_katalog_buku" method="POST" onsubmit="return konfirmasiHapusDatabase(event);" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="btn btn-outline-danger btn-sm px-2.5 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 rounded-3" title="Kosongkan Katalog Buku">
                     <i class="bi bi-trash3"></i> Kosongkan Katalog
                 </button>
@@ -197,9 +198,12 @@
                                         <a href="/edit/{{ b.id }}" class="btn btn-outline-secondary" title="Edit Buku" style="border-color: #E2E8F0; color: #475569;">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <a href="/delete/{{ b.id }}" class="btn btn-outline-danger" onclick="return confirm('Hapus aset buku ini dari gudang sistem?')" title="Hapus Buku" style="border-color: #FECACA;">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
+                                        <form action="/delete/{{ b.id }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus aset buku ini dari gudang sistem?')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <button type="submit" class="btn btn-outline-danger" title="Hapus Buku" style="border-color: #FECACA; border-top-left-radius: 0; border-bottom-left-radius: 0;">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
                                     </div>
                                 </td>
                                 {% endif %}
@@ -271,6 +275,7 @@
             </div>
             
             <form action="/add" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="modal-body p-4" style="max-height: 72vh; overflow-y: auto;">
                     <div class="row g-4">
                         <!-- Kolom Kiri: Informasi Bibliografi Publik -->
@@ -394,6 +399,7 @@
             </div>
             
             <form action="{{ url_for('import_excel') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="modal-body p-4">
                     <div class="p-3 rounded-3 mb-3 border" style="background-color: #EFF6FF; border-color: #BFDBFE !important;">
                         <div class="d-flex align-items-start gap-2 mb-1.5">

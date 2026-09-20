@@ -23,6 +23,7 @@
         </div>
 
         <form action="/edit/{{ buku.id }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="back_url" value="{{ back_url }}">
 
             <!-- Bagian 1: Informasi Bibliografi & Katalog -->

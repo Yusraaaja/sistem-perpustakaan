@@ -113,9 +113,12 @@
             <a href="/edit/{{ buku.id }}" class="btn btn-outline-primary btn-sm px-3 py-1.5 rounded-3 d-inline-flex align-items-center gap-1.5">
                 <i class="bi bi-pencil-square"></i> Edit Data
             </a>
-            <a href="/delete/{{ buku.id }}" class="btn btn-outline-danger btn-sm px-3 py-1.5 rounded-3 d-inline-flex align-items-center gap-1.5" onclick="return confirm('Hapus buku ini dari database sistem?')">
-                <i class="bi bi-trash3"></i> Hapus
-            </a>
+            <form action="/delete/{{ buku.id }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus buku ini dari database sistem?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-outline-danger btn-sm px-3 py-1.5 rounded-3 d-inline-flex align-items-center gap-1.5">
+                    <i class="bi bi-trash3"></i> Hapus
+                </button>
+            </form>
         </div>
     {% endif %}
 </div>
@@ -192,6 +195,7 @@
                     <div class="collapse mt-2" id="formGantiCover">
                         <div class="p-3 bg-light rounded-3 border">
                             <form action="/buku/{{ buku.id }}/upload_cover" method="POST" enctype="multipart/form-data">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <label class="form-label small fw-semibold text-secondary mb-1">Pilih File Gambar:</label>
                                 <input type="file" name="cover_file" class="form-control form-control-sm mb-2 rounded-2" accept="image/*" required>
                                 <button type="submit" class="btn btn-primary btn-sm w-100 rounded-2 fw-semibold">Simpan Cover</button>
@@ -339,6 +343,7 @@
                 {# --- HANYA MUNCUL JIKA ADMIN SUDAH LOGIN --- #}
                 {% if buku.stok > 0 %}
                 <form action="/proses_pinjam_admin" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="back_url" value="{{ request.path }}">
                     <input type="hidden" name="tipe_user" value="Siswa">
                     
