@@ -26,19 +26,15 @@
             </form>
         {% endif %}
         
-        <form action="/koleksi" method="GET" class="d-flex" style="min-width: 260px;">
-            <div class="input-group input-group-sm shadow-sm">
-                <input type="text" name="query" class="form-control rounded-start-3" 
-            <div class="input-group input-group-sm shadow-sm smart-search-wrapper">
-                <input type="text" name="query" class="form-control rounded-start-3 smart-search-input" 
-                       placeholder="Cari Judul / No Reg / Penulis..." value="{{ query or '' }}"
-                       style="border-color: #E2E8F0; font-size: 0.8125rem;">
-                       style="border-color: #E2E8F0; font-size: 0.8125rem;" autocomplete="off">
-                <button type="submit" class="btn btn-primary rounded-end-3 px-3">
-                    <i class="bi bi-search"></i>
-                </button>
-            </div>
+        <form action="/koleksi" method="GET" class="d-flex" style="min-width: 260px;"> 
+            <div class="input-group input-group-sm shadow-sm smart-search-wrapper"> 
+                <input type="text" name="query" class="form-control rounded-start-3 smart-search-input" placeholder="Cari Judul / No Reg / Penulis..." value="{{ query or '' }}" style="border-color: #E2E8F0; font-size: 0.8125rem;" autocomplete="off"> 
+                <button type="submit" class="btn btn-primary rounded-end-3 px-3"> 
+                    <i class="bi bi-search"></i> 
+                </button> 
+            </div> 
         </form>
+
     </div>
 </div>
 
