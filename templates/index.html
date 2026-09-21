@@ -15,9 +15,64 @@
     </form>
 
     <hr class="text-muted opacity-25 mb-4">
+    <!-- AI Book Assistant Panel -->
+    <div class="ai-assistant-card mb-4">
+        <div class="ai-assistant-header">
+            <div class="d-flex align-items-center gap-2">
+                <span class="d-inline-flex align-items-center justify-content-center rounded-3 bg-primary text-white" style="width: 32px; height: 32px;">
+                    <i class="bi bi-stars fs-6"></i>
+                </span>
+                <div>
+                    <h6 class="mb-0 fw-bold text-dark">AI Book Assistant</h6>
+                    <small class="text-muted" style="font-size: 11px;">Rekomendasi Cerdas Katalog Perpustakaan</small>
+                </div>
+            </div>
+            <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1" style="font-size: 11px;">
+                <i class="bi bi-shield-check me-1"></i>Katalog Grounded
+            </span>
+        </div>
 
     <div class="text-center py-4 text-muted">
         <p>Gunakan kolom di atas untuk mencari buku di perpustakaan</p>
+        <div class="ai-chat-area" id="aiChatArea">
+            <!-- Initial State Greeting -->
+            <div class="ai-msg ai-msg-bot">
+                <div class="ai-msg-avatar"><i class="bi bi-robot"></i></div>
+                <div class="ai-msg-bubble">
+                    Halo! Saya asisten pintar perpustakaan. Tanyakan buku apa saja yang ingin Anda pelajari, topik menarik, atau minta rekomendasi dari koleksi katalog kami.
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Prompt Chips -->
+        <div class="p-3 bg-white border-top border-light-subtle">
+            <div class="d-flex align-items-center gap-1.5 flex-wrap mb-2">
+                <span class="text-muted small me-1" style="font-size: 11px;"><i class="bi bi-lightbulb me-1 text-warning"></i>Contoh:</span>
+                <button type="button" class="ai-prompt-chip" data-prompt="Saya ingin belajar Python untuk pemula">
+                    Belajar Python Pemula
+                </button>
+                <button type="button" class="ai-prompt-chip" data-prompt="Ada buku tentang pengembangan diri?">
+                    Pengembangan Diri
+                </button>
+                <button type="button" class="ai-prompt-chip" data-prompt="Apakah ada buku karya Andrea Hirata?">
+                    Karya Andrea Hirata
+                </button>
+                <button type="button" class="ai-prompt-chip" data-prompt="Rekomendasi buku jaringan komputer">
+                    Jaringan Komputer
+                </button>
+            </div>
+
+            <!-- Input Form -->
+            <form id="aiChatForm" class="d-flex gap-2">
+                <input type="text" id="aiUserInput" class="form-control form-control-sm rounded-3 shadow-none" 
+                       placeholder="Ketik pertanyaan untuk AI Assistant (contoh: Saya butuh buku pemrograman)..." 
+                       maxlength="300" autocomplete="off" required>
+                <button type="submit" id="aiSendBtn" class="btn btn-primary btn-sm px-3 rounded-3 d-inline-flex align-items-center gap-1.5 shadow-sm flex-shrink-0">
+                    <span id="aiBtnText"><i class="bi bi-send-fill"></i> Tanya AI</span>
+                    <span id="aiBtnSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
+            </form>
+        </div>
     </div>
 
     <div class="row mt-2 g-3">
@@ -118,4 +173,168 @@
         </div>
     </div>
 </div>
-{% endblock %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chatForm = document.getElementById('aiChatForm');
+    const chatInput = document.getElementById('aiUserInput');
+    const chatArea = document.getElementById('aiChatArea');
+    const sendBtn = document.getElementById('aiSendBtn');
+    const btnText = document.getElementById('aiBtnText');
+    const btnSpinner = document.getElementById('aiBtnSpinner');
+    const promptChips = document.querySelectorAll('.ai-prompt-chip');
+
+    // Ambil CSRF token dari meta tag
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function appendUserMessage(msg) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'ai-msg ai-msg-user';
+        msgDiv.innerHTML = `
+            <div class="ai-msg-avatar"><i class="bi bi-person-fill"></i></div>
+            <div class="ai-msg-bubble">${escapeHtml(msg)}</div>
+        `;
+        chatArea.appendChild(msgDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function appendLoadingMessage() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'ai-msg ai-msg-bot';
+        loadingDiv.id = 'aiLoadingBubble';
+        loadingDiv.innerHTML = `
+            <div class="ai-msg-avatar"><i class="bi bi-robot"></i></div>
+            <div class="ai-msg-bubble text-muted">
+                <span class="small me-2">Sedang mencari di katalog...</span>
+                <span class="ai-loading-dots"><span></span><span></span><span></span></span>
+            </div>
+        `;
+        chatArea.appendChild(loadingDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+        return loadingDiv;
+    }
+
+    function appendBotMessage(answer, books) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'ai-msg ai-msg-bot';
+
+        let booksHtml = '';
+        if (books && books.length > 0) {
+            booksHtml = `<div class="ai-recommended-books">`;
+            books.forEach(b => {
+                let thumb = b.cover_url ? 
+                    `<img src="${escapeHtml(b.cover_url)}" style="width: 32px; height: 42px; object-fit: cover; border-radius: 4px;" alt="Cover">` :
+                    `<div class="d-flex align-items-center justify-content-center rounded bg-primary-subtle text-primary" style="width: 32px; height: 42px;"><i class="bi bi-book"></i></div>`;
+
+                let stockBadge = b.stok > 0 ? 
+                    `<span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 10px;">Stok: ${escapeHtml(b.stok)}</span>` :
+                    `<span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10px;">Habis</span>`;
+
+                booksHtml += `
+                    <div class="ai-book-card">
+                        <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                            ${thumb}
+                            <div class="text-truncate">
+                                <div class="fw-semibold text-dark text-truncate" style="font-size: 0.8125rem;">${escapeHtml(b.judul)}</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.725rem;">${escapeHtml(b.penulis || '-')} &bull; ${stockBadge}</div>
+                            </div>
+                        </div>
+                        <a href="/buku/${encodeURIComponent(b.id)}" class="btn btn-outline-primary btn-sm px-2.5 py-1 text-nowrap rounded-2" style="font-size: 0.75rem;">
+                            <i class="bi bi-arrow-right"></i> Lihat Buku
+                        </a>
+                    </div>
+                `;
+            });
+            booksHtml += `</div>`;
+        }
+
+        const formattedAnswer = escapeHtml(answer).replace(/\n/g, '<br>');
+
+        msgDiv.innerHTML = `
+            <div class="ai-msg-avatar"><i class="bi bi-robot"></i></div>
+            <div class="ai-msg-bubble">
+                <div>${formattedAnswer}</div>
+                ${booksHtml}
+            </div>
+        `;
+        chatArea.appendChild(msgDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    async function sendQuery(queryText) {
+        if (!queryText || !queryText.trim()) return;
+        queryText = queryText.trim();
+
+        appendUserMessage(queryText);
+        chatInput.value = '';
+
+        sendBtn.disabled = true;
+        chatInput.disabled = true;
+        btnText.classList.add('d-none');
+        btnSpinner.classList.remove('d-none');
+
+        const loadingBubble = appendLoadingMessage();
+
+        try {
+            const response = await fetch('/api/ai_chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ message: queryText, csrf_token: csrfToken })
+            });
+
+            if (loadingBubble && loadingBubble.parentNode) {
+                loadingBubble.parentNode.removeChild(loadingBubble);
+            }
+
+            const data = await response.json();
+            if (response.ok && data.status === 'success') {
+                appendBotMessage(data.answer, data.books);
+            } else {
+                appendBotMessage(data.message || 'Maaf, terjadi kendala saat memproses pertanyaan Anda.', []);
+            }
+        } catch (err) {
+            if (loadingBubble && loadingBubble.parentNode) {
+                loadingBubble.parentNode.removeChild(loadingBubble);
+            }
+            appendBotMessage('Tidak dapat terhubung ke server perpustakaan. Silakan periksa jaringan Anda.', []);
+        } finally {
+            sendBtn.disabled = false;
+            chatInput.disabled = false;
+            btnText.classList.remove('d-none');
+            btnSpinner.classList.add('d-none');
+            chatInput.focus();
+        }
+    }
+
+    if (chatForm) {
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            sendQuery(chatInput.value);
+        });
+    }
+
+    promptChips.forEach(chip => {
+        chip.addEventListener('click', function() {
+            const prompt = this.getAttribute('data-prompt');
+            if (prompt) {
+                sendQuery(prompt);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
