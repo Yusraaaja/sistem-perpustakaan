@@ -67,7 +67,7 @@ else:
 
 # Konfigurasi AI Book Assistant (Google Gemini API)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-1.5-flash').strip()
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash').strip()
 
 # ==============================================================================
 # CSRF PROTECTION ENGINE (Synchronizer Token Pattern)
@@ -463,7 +463,7 @@ def call_gemini_api(system_instruction, user_prompt):
     if not api_key:
         return False, "AI Book Assistant belum dikonfigurasi pada server (GEMINI_API_KEY belum disetel)."
 
-    model = os.environ.get('GEMINI_MODEL') or GEMINI_MODEL or 'gemini-1.5-flash'
+    model = os.environ.get('GEMINI_MODEL') or GEMINI_MODEL or 'gemini-2.5-flash'
     endpoint_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
     payload = {

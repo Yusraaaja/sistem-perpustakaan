@@ -331,10 +331,11 @@ document.addEventListener('DOMContentLoaded', function() {
         chip.addEventListener('click', function() {
             const prompt = this.getAttribute('data-prompt');
             if (prompt) {
-                sendQuery(prompt);
+                chatInput.value = prompt;
+                chatInput.focus();
             }
         });
     });
 });
 </script>
-{% endblock %}
+{% endblock %}
