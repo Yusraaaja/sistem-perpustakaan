@@ -471,19 +471,45 @@ class GeminiErrorResult(str):
         obj.message = message
         return obj
 
-def call_gemini_api(system_instruction, user_prompt):
-    api_key = os.environ.get('GEMINI_API_KEY') or GEMINI_API_KEY
-    if not api_key:
-        return False, GeminiErrorResult(
-            "Layanan AI belum dapat digunakan saat ini.",
-            error_code="ai_configuration_error",
-            http_status=500
-        )
+_GEMINI_MAX_OUTPUT_TOKENS = 4096
+_GEMINI_MAX_OUTPUT_TOKENS_RETRY = 8192
+_GEMINI_MAX_API_CALLS = 3
+_GEMINI_BLOCKED_FINISH_REASONS = {
+    'SAFETY', 'RECITATION', 'BLOCKLIST', 'PROHIBITED_CONTENT', 'SPII', 'LANGUAGE'
+}
 
-    model = os.environ.get('GEMINI_MODEL') or GEMINI_MODEL or 'gemini-2.5-flash'
-    endpoint_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+def _gemini_model_uses_thinking(model_name):
+    name = (model_name or '').lower()
+    return '2.5' in name or 'gemini-3' in name
 
-    payload = {
+def _extract_gemini_candidate_text(candidate):
+    """Gabungkan semua parts teks visibel; lewati thought parts. Kembalikan (text, finish_reason)."""
+    if not isinstance(candidate, dict):
+        return '', ''
+    finish_reason = str(candidate.get('finishReason') or '').strip().upper()
+    content = candidate.get('content') if isinstance(candidate.get('content'), dict) else {}
+    parts = content.get('parts') if isinstance(content.get('parts'), list) else []
+    chunks = []
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        if part.get('thought') is True:
+            continue
+        text = part.get('text')
+        if isinstance(text, str) and text:
+            chunks.append(text)
+    return ''.join(chunks).strip(), finish_reason
+
+def _build_gemini_payload(system_instruction, user_prompt, max_output_tokens, include_thinking_config):
+    generation_config = {
+        "temperature": 0.2,
+        "maxOutputTokens": int(max_output_tokens),
+        "topP": 0.8
+    }
+    if include_thinking_config:
+        # Gemini 2.5 menghitung thinking tokens ke maxOutputTokens; 0 = matikan thinking.
+        generation_config["thinkingConfig"] = {"thinkingBudget": 0}
+    return {
         "contents": [
             {
                 "role": "user",
@@ -497,113 +523,180 @@ def call_gemini_api(system_instruction, user_prompt):
                 {"text": system_instruction}
             ]
         },
-        "generationConfig": {
-            "temperature": 0.2,
-            "maxOutputTokens": 800,
-            "topP": 0.8
-        }
+        "generationConfig": generation_config
     }
 
-    req_data = json.dumps(payload).encode('utf-8')
-    req = urllib.request.Request(
-        endpoint_url,
-        data=req_data,
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
+def _map_gemini_http_error(status_code, api_msg):
+    api_msg_lower = (api_msg or '').lower()
 
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            res_body = response.read().decode('utf-8')
-            try:
-                res_json = json.loads(res_body)
-            except Exception:
-                return False, GeminiErrorResult(
-                    "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
-                    error_code="ai_upstream_error",
-                    http_status=502
-                )
+    if status_code == 429 or 'quota' in api_msg_lower or 'resource_exhausted' in api_msg_lower or 'resource has been exhausted' in api_msg_lower:
+        return GeminiErrorResult(
+            "Layanan AI sedang mencapai batas penggunaan. Silakan coba lagi nanti.",
+            error_code="ai_quota_exceeded",
+            http_status=429
+        )
 
-            candidates = res_json.get('candidates', []) if isinstance(res_json, dict) else []
-            if candidates and isinstance(candidates, list):
-                content = candidates[0].get('content', {}) if isinstance(candidates[0], dict) else {}
-                parts = content.get('parts', []) if isinstance(content, dict) else []
-                if parts and isinstance(parts, list) and isinstance(parts[0], dict) and 'text' in parts[0]:
-                    text = (parts[0]['text'] or '').strip()
-                    if text:
-                        return True, text
+    if status_code in (401, 403) or (status_code == 400 and ('api key' in api_msg_lower or 'api_key' in api_msg_lower or 'invalid' in api_msg_lower)):
+        return GeminiErrorResult(
+            "Layanan AI belum dapat digunakan saat ini.",
+            error_code="ai_configuration_error",
+            http_status=500
+        )
 
-            return False, GeminiErrorResult(
-                "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
-                error_code="ai_upstream_error",
-                http_status=502
-            )
-    except urllib.error.HTTPError as e:
-        status_code = getattr(e, 'code', 500)
-        api_msg = ""
-        try:
-            err_json = json.loads(e.read().decode('utf-8'))
-            if isinstance(err_json, dict) and 'error' in err_json and isinstance(err_json['error'], dict):
-                api_msg = str(err_json['error'].get('message', ''))
-        except Exception:
-            pass
-
-        api_msg_lower = api_msg.lower()
-
-        # 1. Quota / Rate limit (HTTP 429 atau indikator resource_exhausted)
-        if status_code == 429 or 'quota' in api_msg_lower or 'resource_exhausted' in api_msg_lower or 'resource has been exhausted' in api_msg_lower:
-            return False, GeminiErrorResult(
-                "Layanan AI sedang mencapai batas penggunaan. Silakan coba lagi nanti.",
-                error_code="ai_quota_exceeded",
-                http_status=429
-            )
-
-        # 2. Authentication / Permission / Invalid API Key (HTTP 401, 403, atau HTTP 400 invalid key)
-        if status_code in (401, 403) or (status_code == 400 and ('api key' in api_msg_lower or 'api_key' in api_msg_lower or 'invalid' in api_msg_lower)):
-            return False, GeminiErrorResult(
-                "Layanan AI belum dapat digunakan saat ini.",
-                error_code="ai_configuration_error",
-                http_status=500
-            )
-
-        # 3. Upstream 5xx error (500, 502, 503, 504 dari Google)
-        if 500 <= status_code < 600:
-            return False, GeminiErrorResult(
-                "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
-                error_code="ai_upstream_error",
-                http_status=502
-            )
-
-        # 4. HTTP error lainnya
-        return False, GeminiErrorResult(
+    if 500 <= status_code < 600:
+        return GeminiErrorResult(
             "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
             error_code="ai_upstream_error",
             http_status=502
         )
-    except (TimeoutError, socket.timeout):
+
+    return GeminiErrorResult(
+        "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
+        error_code="ai_upstream_error",
+        http_status=502
+    )
+
+def call_gemini_api(system_instruction, user_prompt):
+    api_key = os.environ.get('GEMINI_API_KEY') or GEMINI_API_KEY
+    if not api_key:
         return False, GeminiErrorResult(
-            "Layanan AI membutuhkan waktu terlalu lama untuk merespons. Silakan coba lagi.",
-            error_code="ai_timeout",
-            http_status=504
+            "Layanan AI belum dapat digunakan saat ini.",
+            error_code="ai_configuration_error",
+            http_status=500
         )
-    except urllib.error.URLError as e:
-        if isinstance(getattr(e, 'reason', None), (socket.timeout, TimeoutError)) or 'timed out' in str(getattr(e, 'reason', '')).lower():
+
+    model = os.environ.get('GEMINI_MODEL') or GEMINI_MODEL or 'gemini-2.5-flash'
+    endpoint_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+
+    include_thinking_config = _gemini_model_uses_thinking(model)
+    max_output_tokens = _GEMINI_MAX_OUTPUT_TOKENS
+    truncated_retried = False
+    thinking_config_retried = False
+
+    for _attempt in range(_GEMINI_MAX_API_CALLS):
+        payload = _build_gemini_payload(
+            system_instruction,
+            user_prompt,
+            max_output_tokens,
+            include_thinking_config
+        )
+        req_data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
+            endpoint_url,
+            data=req_data,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=45) as response:
+                res_body = response.read().decode('utf-8')
+        except urllib.error.HTTPError as e:
+            status_code = getattr(e, 'code', 500)
+            api_msg = ""
+            try:
+                err_json = json.loads(e.read().decode('utf-8'))
+                if isinstance(err_json, dict) and 'error' in err_json and isinstance(err_json['error'], dict):
+                    api_msg = str(err_json['error'].get('message', ''))
+            except Exception:
+                pass
+
+            api_msg_lower = api_msg.lower()
+            thinking_rejected = (
+                include_thinking_config
+                and not thinking_config_retried
+                and status_code == 400
+                and ('thinking' in api_msg_lower or 'generationconfig' in api_msg_lower)
+            )
+            if thinking_rejected:
+                include_thinking_config = False
+                thinking_config_retried = True
+                continue
+
+            return False, _map_gemini_http_error(status_code, api_msg)
+        except (TimeoutError, socket.timeout):
             return False, GeminiErrorResult(
                 "Layanan AI membutuhkan waktu terlalu lama untuk merespons. Silakan coba lagi.",
                 error_code="ai_timeout",
                 http_status=504
             )
+        except urllib.error.URLError as e:
+            if isinstance(getattr(e, 'reason', None), (socket.timeout, TimeoutError)) or 'timed out' in str(getattr(e, 'reason', '')).lower():
+                return False, GeminiErrorResult(
+                    "Layanan AI membutuhkan waktu terlalu lama untuk merespons. Silakan coba lagi.",
+                    error_code="ai_timeout",
+                    http_status=504
+                )
+            return False, GeminiErrorResult(
+                "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
+                error_code="ai_upstream_error",
+                http_status=502
+            )
+        except Exception:
+            return False, GeminiErrorResult(
+                "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
+                error_code="ai_upstream_error",
+                http_status=502
+            )
+
+        try:
+            res_json = json.loads(res_body)
+        except Exception:
+            return False, GeminiErrorResult(
+                "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
+                error_code="ai_upstream_error",
+                http_status=502
+            )
+
+        if not isinstance(res_json, dict):
+            return False, GeminiErrorResult(
+                "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
+                error_code="ai_upstream_error",
+                http_status=502
+            )
+
+        candidates = res_json.get('candidates', [])
+        if not (isinstance(candidates, list) and candidates):
+            return False, GeminiErrorResult(
+                "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
+                error_code="ai_upstream_error",
+                http_status=502
+            )
+
+        text, finish_reason = _extract_gemini_candidate_text(candidates[0])
+
+        if finish_reason == 'MAX_TOKENS':
+            if not truncated_retried:
+                truncated_retried = True
+                max_output_tokens = _GEMINI_MAX_OUTPUT_TOKENS_RETRY
+                continue
+            return False, GeminiErrorResult(
+                "Jawaban AI terpotong sebelum selesai. Silakan kirim ulang pertanyaan Anda.",
+                error_code="ai_output_truncated",
+                http_status=502
+            )
+
+        if finish_reason in _GEMINI_BLOCKED_FINISH_REASONS:
+            return False, GeminiErrorResult(
+                "Layanan AI tidak dapat menampilkan jawaban untuk permintaan ini.",
+                error_code="ai_upstream_error",
+                http_status=502
+            )
+
+        if text:
+            return True, text
+
         return False, GeminiErrorResult(
             "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
             error_code="ai_upstream_error",
             http_status=502
         )
-    except Exception:
-        return False, GeminiErrorResult(
-            "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
-            error_code="ai_upstream_error",
-            http_status=502
-        )
+
+    return False, GeminiErrorResult(
+        "Layanan AI sedang mengalami gangguan. Silakan coba lagi nanti.",
+        error_code="ai_upstream_error",
+        http_status=502
+    )
 
 def extract_and_verify_books(text, relevant_books):
     found_ids = set()
