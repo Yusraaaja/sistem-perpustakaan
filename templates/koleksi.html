@@ -446,11 +446,21 @@ function konfirmasiHapusDatabase(event) {
     event.preventDefault();
     const form = event.target;
     
-    let cek1 = confirm("PERINGATAN KRITIS:\nTindakan ini akan menghapus SELURUH DATA KATALOG BUKU dari sistem secara permanen.\n\nApakah Anda yakin?");
-    if(cek1) {
-        let cek2 = confirm("KONFIRMASI AKHIR:\nData yang sudah dihapus tidak dapat dikembalikan kecuali Anda melakukan Import ulang berkas Excel baru.\n\nLanjutkan eksekusi pengosongan database?");
-        if(cek2) {
+    let cek1 = confirm("PERINGATAN KRITIS:\nTindakan ini akan menghapus SELURUH DATA KATALOG BUKU dari sistem secara permanen.\n\nApakah Anda yakin ingin melanjutkan?");
+    if (cek1) {
+        let inputKonfirmasi = prompt("KONFIRMASI AKHIR KEAMANAN:\nKetik 'KOSONGKAN' dengan huruf kapital untuk mengonfirmasi pengosongan seluruh katalog buku:");
+        if (inputKonfirmasi === 'KOSONGKAN') {
+            let existingHidden = form.querySelector('input[name="konfirmasi"]');
+            if (!existingHidden) {
+                existingHidden = document.createElement('input');
+                existingHidden.type = 'hidden';
+                existingHidden.name = 'konfirmasi';
+                form.appendChild(existingHidden);
+            }
+            existingHidden.value = 'KOSONGKAN';
             form.submit();
+        } else if (inputKonfirmasi !== null) {
+            alert("Pengosongan katalog dibatalkan. Kata kunci konfirmasi tidak sesuai.");
         }
     }
 }
