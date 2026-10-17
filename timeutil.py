@@ -163,3 +163,4 @@ def calculate_overdue_days_from_dates(check_date: date, due_date: date) -> int:
     """
     selisih = (check_date - due_date).days
     return max(0, selisih)
+

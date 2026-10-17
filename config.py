@@ -20,3 +20,4 @@ def get_school_timezone():
     except Exception:
         # Fallback ke Asia/Jakarta jika nama zona waktu tidak valid
         return zoneinfo.ZoneInfo('Asia/Jakarta')
+

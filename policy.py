@@ -44,3 +44,4 @@ NOTIF_NAME_MODE = os.environ.get('POLICY_NOTIF_NAME_MODE', 'full').strip().lower
 # Opsi: "serious_only" (blokir jika telat > 7 hari atau ada ganti rugi pending) atau "any_overdue"
 # Default: "serious_only".
 BLOCK_MODE = os.environ.get('POLICY_BLOCK_MODE', 'serious_only').strip().lower()
+
