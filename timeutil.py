@@ -164,3 +164,36 @@ def calculate_overdue_days_from_dates(check_date: date, due_date: date) -> int:
     selisih = (check_date - due_date).days
     return max(0, selisih)
 
+
+def format_iso_utc(dt_or_val: Union[datetime, date, str, None]) -> Optional[str]:
+    """
+    Memformat waktu menjadi format seragam ISO8601 UTC: 'YYYY-MM-DDTHH:MM:SSZ'.
+    Memenuhi R2 dan DEC-020.
+    """
+    if dt_or_val is None:
+        return None
+    parsed = parse_db_time(dt_or_val)
+    if parsed is None:
+        return None
+    utc_dt = parsed.astimezone(timezone.utc)
+    return utc_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def legacy_date_to_utc_iso(date_str: str, time_of_day: str = '00:00:00') -> Optional[str]:
+    """
+    Mengonversi tanggal naive data lama (berbasis WIB / Asia/Jakarta) ke ISO8601 UTC.
+    Memenuhi R7:
+    - borrowed_at: tanggal 00:00:00 WIB -> UTC
+    - returned_at & due_at: tanggal 23:59:59 WIB -> UTC
+    """
+    if not date_str or not str(date_str).strip():
+        return None
+    clean_date = str(date_str).strip().split(' ')[0].split('T')[0]
+    dt_wib_str = f"{clean_date} {time_of_day}"
+    try:
+        dt_wib = datetime.strptime(dt_wib_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=WIB_TZ)
+        utc_dt = dt_wib.astimezone(timezone.utc)
+        return utc_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+    except ValueError:
+        return None
+
