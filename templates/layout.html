@@ -432,7 +432,9 @@
             position: absolute;
             right: 0;
             bottom: calc(56px + 12px);
-            max-width: min(280px, calc(100vw - 96px));
+            width: min(340px, 100vw - 96px);
+            max-width: calc(100vw - 96px);
+            z-index: 2;
             background: #FFFFFF;
             color: #0F172A;
             border: 1px solid #E2E8F0;
@@ -441,7 +443,6 @@
             font-size: 0.8125rem;
             line-height: 1.5;
             box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
-            position: relative;
             opacity: 0;
             transform: translateY(8px);
             visibility: hidden;
@@ -689,9 +690,9 @@
         .srax-ai-form .form-control {
             min-height: 42px;
         }
-        #sraxAiSendBtn {
+        #aiSendBtn {
             min-width: 44px;
-            min-height: 42px;
+            min-height: 44px;
         }
 
         .ai-loading-dots span {
@@ -722,7 +723,8 @@
                 max-height: none;
             }
             .srax-ai-bubble {
-                max-width: min(260px, calc(100vw - 88px));
+                width: calc(100vw - 88px);
+                max-width: calc(100vw - 88px);
             }
         }
 
@@ -1271,8 +1273,11 @@
             const firstDelay = seen ? 180000 : (prefersReducedMotion() ? 200 : 700);
             setTimeout(function() {
                 if (panelOpen) return;
+                let count = 0;
+                try { count = parseInt(sessionStorage.getItem(STORAGE_BUBBLE_COUNT) || '0', 10) || 0; } catch (e) {}
+                if (count >= 2) return;
                 showBubble();
-                try { sessionStorage.setItem(STORAGE_BUBBLE_COUNT, '1'); } catch (e) {}
+                try { sessionStorage.setItem(STORAGE_BUBBLE_COUNT, String(seen ? Math.max(2, count + 1) : 1)); } catch (e) {}
             }, firstDelay);
             if (!seen) {
                 bubbleReturnTimer = setTimeout(function() {
