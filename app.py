@@ -16,6 +16,10 @@ import re
 import time
 import threading
 
+from config import SCHOOL_TZ, get_school_timezone
+from policy import LOAN_HOURS, EXTEND_DAYS, MAX_EXTENSIONS, SERIOUS_OVERDUE_DAYS, ALLOW_RENEW_AFTER_DUE, GROUP_WINDOW_HOURS, NOTIF_NAME_MODE, BLOCK_MODE
+from timeutil import now_utc, to_school_tz, format_school, format_school_date, parse_db_time, check_overdue
+
 # ==============================================================================
 # ENVIRONMENT & SECURITY CONFIGURATION
 # ==============================================================================
@@ -991,7 +995,7 @@ def tambah_buku():
     id_buku_fisik = request.form.get('id_buku_fisik', '').strip()
     lokasi_rak = request.form.get('lokasi_rak', '')
     sumber_perolehan = request.form.get('sumber_perolehan', 'Pembelian')
-    tanggal_masuk = request.form.get('tanggal_masuk', datetime.now().strftime('%Y-%m-%d'))
+    tanggal_masuk = request.form.get('tanggal_masuk', format_school_date(now_utc()))
     kondisi_buku = request.form.get('kondisi_buku', 'Baik')
 
     # Sinkronisasi Otomatis Nilai Stok Berdasarkan Jumlah Nomor Registrasi Input
@@ -1011,7 +1015,7 @@ def tambah_buku():
         is_valid, err_msg = validate_image_file(file)
         if is_valid:
             safe_name = secure_filename(file.filename)
-            unique_filename = f"cover_{int(datetime.now().timestamp())}_{safe_name}"
+            unique_filename = f"cover_{int(now_utc().timestamp())}_{safe_name}"
             target_path = os.path.abspath(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
             upload_dir = os.path.abspath(app.config['UPLOAD_FOLDER'])
             if target_path.startswith(upload_dir):
@@ -1222,7 +1226,7 @@ def upload_cover(id):
     is_valid, err_msg = validate_image_file(file)
     if is_valid:
         safe_name = secure_filename(file.filename)
-        unique_filename = f"buku_{id}_{int(datetime.now().timestamp())}_{safe_name}"
+        unique_filename = f"buku_{id}_{int(now_utc().timestamp())}_{safe_name}"
         target_path = os.path.abspath(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
         upload_dir = os.path.abspath(app.config['UPLOAD_FOLDER'])
 
@@ -1258,7 +1262,8 @@ def daftar_peminjaman():
     ).fetchone()[0] > 0
 
     peminjaman_final = []
-    tgl_sekarang = datetime.now().date()
+    now_school = to_school_tz(now_utc())
+    tgl_sekarang = now_school.date()
 
     if not has_detail:
         # Fallback jika database belum dimigrasikan
@@ -1273,14 +1278,13 @@ def daftar_peminjaman():
             p['terlambat'] = False
             p['durasi_terlambat'] = 0
             if p['status'] == 'Dipinjam' and p['tgl_kembali_seharusnya']:
-                try:
-                    tgl_tenggat = datetime.strptime(p['tgl_kembali_seharusnya'], '%Y-%m-%d').date()
+                tgl_tenggat_dt = parse_db_time(p['tgl_kembali_seharusnya'])
+                if tgl_tenggat_dt:
+                    tgl_tenggat = to_school_tz(tgl_tenggat_dt).date()
                     selisih = (tgl_sekarang - tgl_tenggat).days
                     if selisih > 0:
                         p['terlambat'] = True
                         p['durasi_terlambat'] = selisih
-                except ValueError:
-                    pass
             reg_extracted = p.get('jurusan', '').split('| Reg:')[-1].strip() if '| Reg:' in p.get('jurusan', '') else '-'
             p['buku_list'] = [{
                 'id': p.get('id'),
@@ -1314,14 +1318,13 @@ def daftar_peminjaman():
 
             # Kalkulasi Durasi Keterlambatan Finansial Dinamis
             if p['status'] in ['Dipinjam', 'Sebagian'] and p['tgl_kembali_seharusnya']:
-                try:
-                    tgl_tenggat = datetime.strptime(p['tgl_kembali_seharusnya'], '%Y-%m-%d').date()
+                tgl_tenggat_dt = parse_db_time(p['tgl_kembali_seharusnya'])
+                if tgl_tenggat_dt:
+                    tgl_tenggat = to_school_tz(tgl_tenggat_dt).date()
                     selisih = (tgl_sekarang - tgl_tenggat).days
                     if selisih > 0:
                         p['terlambat'] = True
                         p['durasi_terlambat'] = selisih
-                except ValueError:
-                    pass
 
             details = conn.execute('''
                 SELECT d.*, b.judul, b.penulis, b.cover_img, b.harga_buku
@@ -1431,9 +1434,9 @@ def proses_pinjam_admin():
             flash(f"Peminjaman dibatalkan! Nomor registrasi berikut tidak tersedia atau sedang dipinjam: {', '.join(unavailable_regs)}", 'danger')
             return redirect(default_redirect)
 
-        tgl_sekarang = datetime.now()
-        tgl_pinjam_str = tgl_sekarang.strftime('%Y-%m-%d')
-        tgl_kembali_str = (tgl_sekarang + timedelta(days=durasi_pinjam)).strftime('%Y-%m-%d')
+        current_utc = now_utc()
+        tgl_pinjam_str = format_school_date(current_utc)
+        tgl_kembali_str = format_school_date(current_utc + timedelta(days=durasi_pinjam))
 
         has_detail = conn.execute(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='peminjaman_detail'"
@@ -1443,7 +1446,7 @@ def proses_pinjam_admin():
         conn.execute("BEGIN TRANSACTION")
 
         if has_detail:
-            date_code = tgl_sekarang.strftime('%Y%m%d')
+            date_code = format_school(current_utc, '%Y%m%d')
             daily_seq = conn.execute(
                 "SELECT COUNT(*) FROM peminjaman WHERE tgl_pinjam = ?", (tgl_pinjam_str,)
             ).fetchone()[0] + 1
@@ -1451,7 +1454,7 @@ def proses_pinjam_admin():
 
             existing_code = conn.execute("SELECT id FROM peminjaman WHERE kode_transaksi = ?", (kode_trx,)).fetchone()
             if existing_code:
-                kode_trx = f"TRX-{date_code}-{int(tgl_sekarang.timestamp() * 1000) % 1000000:06d}"
+                kode_trx = f"TRX-{date_code}-{int(current_utc.timestamp() * 1000) % 1000000:06d}"
 
             cursor = conn.cursor()
             cursor.execute('''
@@ -1511,8 +1514,8 @@ def proses_kembalikan_item(detail_id):
     if status_kembali not in ['Kembali', 'Rusak', 'Hilang']:
         status_kembali = 'Kembali'
 
-    tgl_sekarang = datetime.now()
-    tgl_sekarang_str = tgl_sekarang.strftime('%Y-%m-%d')
+    current_utc = now_utc()
+    tgl_sekarang_str = format_school_date(current_utc)
 
     conn = get_db_connection()
     try:
@@ -1542,11 +1545,14 @@ def proses_kembalikan_item(detail_id):
         denda_keterlambatan = 0
         if item['tgl_kembali_seharusnya']:
             try:
-                tgl_seharusnya = datetime.strptime(item['tgl_kembali_seharusnya'], '%Y-%m-%d').date()
-                hari_terlambat = (tgl_sekarang.date() - tgl_seharusnya).days
-                if hari_terlambat > 0:
-                    denda_keterlambatan = hari_terlambat * 1000
-            except ValueError:
+                tgl_seharusnya_dt = parse_db_time(item['tgl_kembali_seharusnya'])
+                if tgl_seharusnya_dt:
+                    tgl_seharusnya = to_school_tz(tgl_seharusnya_dt).date()
+                    curr_date = to_school_tz(current_utc).date()
+                    hari_terlambat = (curr_date - tgl_seharusnya).days
+                    if hari_terlambat > 0:
+                        denda_keterlambatan = hari_terlambat * 1000
+            except Exception:
                 pass
 
         denda_kondisi = 0
@@ -1623,8 +1629,8 @@ def proses_kembalikan(pinjam_id):
     if status_kembali not in ['Kembali', 'Rusak', 'Hilang']:
         status_kembali = 'Kembali'
 
-    tgl_sekarang = datetime.now()
-    tgl_sekarang_str = tgl_sekarang.strftime('%Y-%m-%d')
+    current_utc = now_utc()
+    tgl_sekarang_str = format_school_date(current_utc)
 
     conn = get_db_connection()
     try:
@@ -1653,11 +1659,14 @@ def proses_kembalikan(pinjam_id):
                 denda_keterlambatan = 0
                 if item['tgl_kembali_seharusnya']:
                     try:
-                        tgl_seharusnya = datetime.strptime(item['tgl_kembali_seharusnya'], '%Y-%m-%d').date()
-                        hari_terlambat = (tgl_sekarang.date() - tgl_seharusnya).days
-                        if hari_terlambat > 0:
-                            denda_keterlambatan = hari_terlambat * 1000
-                    except ValueError:
+                        tgl_seharusnya_dt = parse_db_time(item['tgl_kembali_seharusnya'])
+                        if tgl_seharusnya_dt:
+                            tgl_seharusnya = to_school_tz(tgl_seharusnya_dt).date()
+                            curr_date = to_school_tz(current_utc).date()
+                            hari_terlambat = (curr_date - tgl_seharusnya).days
+                            if hari_terlambat > 0:
+                                denda_keterlambatan = hari_terlambat * 1000
+                    except Exception:
                         pass
 
                 denda_kondisi = 0
@@ -1724,10 +1733,16 @@ def proses_kembalikan(pinjam_id):
             if pinjaman:
                 denda_keterlambatan = 0
                 if pinjaman['tgl_kembali_seharusnya']:
-                    tgl_seharusnya = datetime.strptime(pinjaman['tgl_kembali_seharusnya'], '%Y-%m-%d')
-                    hari_terlambat = (tgl_sekarang.date() - tgl_seharusnya.date()).days
-                    if hari_terlambat > 0:
-                        denda_keterlambatan = hari_terlambat * 1000
+                    try:
+                        tgl_seharusnya_dt = parse_db_time(pinjaman['tgl_kembali_seharusnya'])
+                        if tgl_seharusnya_dt:
+                            tgl_seharusnya = to_school_tz(tgl_seharusnya_dt).date()
+                            curr_date = to_school_tz(current_utc).date()
+                            hari_terlambat = (curr_date - tgl_seharusnya).days
+                            if hari_terlambat > 0:
+                                denda_keterlambatan = hari_terlambat * 1000
+                    except Exception:
+                        pass
                 denda_kondisi = 0
                 harga_buku_asli = pinjaman['harga_buku'] if pinjaman['harga_buku'] else 0
                 no_reg_kembali = None
@@ -1955,7 +1970,7 @@ def export_peminjaman():
         df.to_excel(writer, index=False, sheet_name='Laporan Sirkulasi')
 
     output.seek(0)
-    nama_file = f"Laporan_Peminjaman_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    nama_file = f"Laporan_Peminjaman_{format_school(now_utc(), '%Y%m%d_%H%M%S')}.xlsx"
 
     return send_file(
         output,

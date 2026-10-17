@@ -26,6 +26,8 @@ class ProductionSafetyHardeningTests(unittest.TestCase):
             library_app._LOGIN_ATTEMPTS.clear()
 
     def tearDown(self):
+        os.environ.pop('DATABASE_NAME', None)
+        os.environ.pop('SQLITE_TIMEOUT', None)
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir, ignore_errors=True)
         with library_app._LOGIN_RATE_LIMIT_LOCK:
