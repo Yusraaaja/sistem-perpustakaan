@@ -19,6 +19,24 @@ import threading
 from config import SCHOOL_TZ, get_school_timezone
 from policy import LOAN_HOURS, EXTEND_DAYS, MAX_EXTENSIONS, SERIOUS_OVERDUE_DAYS, ALLOW_RENEW_AFTER_DUE, GROUP_WINDOW_HOURS, NOTIF_NAME_MODE, BLOCK_MODE
 from timeutil import now_utc, to_school_tz, format_school, format_school_date, parse_db_time, check_overdue
+from db import detect_schema_version
+from repositories import catalog_repo, copy_repo, member_repo, loan_repo, audit_repo
+from services import (
+    borrow_copies,
+    return_copies,
+    extend_loan,
+    resolve_lost_or_damaged,
+    deactivate_copy,
+    MemberNotFoundError,
+    MemberInactiveError,
+    CopyNotFoundError,
+    CopyNotAvailableError,
+    LoanItemNotFoundError,
+    LoanItemAlreadyReturnedError,
+    LoanExtensionLimitReachedError,
+    InvalidOperationError,
+    ValidationError,
+)
 
 # ==============================================================================
 # ENVIRONMENT & SECURITY CONFIGURATION
@@ -1103,7 +1121,7 @@ def edit_buku(id):
 
         return redirect(back_url_post)
 
-@app.route('/delete/<int:id>', methods=['POST'])
+@app.route('/delete/<id>', methods=['POST'])
 def hapus_buku(id):
     if not session.get('logged_in'):
         flash('Silakan login terlebih dahulu!', 'danger')
@@ -1111,9 +1129,29 @@ def hapus_buku(id):
 
     conn = get_db_connection()
     try:
-        conn.execute('DELETE FROM buku WHERE id = ?', (id,))
-        conn.commit()
-        flash('Aset buku berhasil dihapus dari sistem.', 'success')
+        schema_ver = detect_schema_version(conn)
+        if schema_ver == 'v2':
+            id_str = str(id).strip()
+            if copy_repo.exists_by_id(conn, id_str):
+                deactivate_copy(conn, copy_id=id_str, reason="Penonaktifan dari dashboard admin", actor=session.get('admin_username', 'admin'))
+                flash('Eksemplar fisik buku berhasil dinonaktifkan tanpa menghapus riwayat.', 'success')
+            elif catalog_repo.exists_by_id(conn, id_str):
+                copies = copy_repo.list_copies_by_title(conn, id_str)
+                active_borrowed = any(loan_repo.get_active_loan_by_copy(conn, c['id']) is not None for c in copies)
+                if active_borrowed:
+                    flash('Gagal menonaktifkan buku: salah satu eksemplar sedang berada dalam peminjaman aktif.', 'danger')
+                else:
+                    for c in copies:
+                        deactivate_copy(conn, copy_id=c['id'], reason="Penonaktifan judul dari dashboard", actor=session.get('admin_username', 'admin'))
+                    flash('Aset buku berhasil dinonaktifkan dari sistem tanpa menghapus riwayat.', 'success')
+            else:
+                flash(f"Aset buku '{id_str}' tidak ditemukan.", 'danger')
+        else:
+            conn.execute('DELETE FROM buku WHERE id = ?', (id,))
+            conn.commit()
+            flash('Aset buku berhasil dihapus dari sistem.', 'success')
+    except InvalidOperationError as e:
+        flash(f'Gagal menonaktifkan buku: {str(e)}', 'danger')
     except sqlite3.Error as e:
         flash(f'Gagal menghapus buku: {str(e)}', 'danger')
     finally:
@@ -1257,13 +1295,84 @@ def daftar_peminjaman():
         return redirect(url_for('login'))
 
     conn = get_db_connection()
-    has_detail = conn.execute(
-        "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='peminjaman_detail'"
-    ).fetchone()[0] > 0
+    schema_ver = detect_schema_version(conn)
 
     peminjaman_final = []
     now_school = to_school_tz(now_utc())
     tgl_sekarang = now_school.date()
+
+    if schema_ver == 'v2':
+        loans = loan_repo.list_loans(conn)
+        for l in loans:
+            raw_items = loan_repo.get_loan_items(conn, l['id'])
+            mapped_items = []
+            for item in raw_items:
+                is_item_kembali = item.get('returned_at') is not None
+                mapped_items.append({
+                    'id': item['id'],
+                    'id_buku': item.get('title_id'),
+                    'judul': item.get('title_judul') or 'Buku',
+                    'penulis': item.get('title_penulis'),
+                    'no_registrasi': item.get('call_number') or item.get('copy_id'),
+                    'status': 'Kembali' if is_item_kembali else 'Dipinjam',
+                    'tgl_dikembalikan': format_school_date(item.get('returned_at')) if item.get('returned_at') else None,
+                    'denda_keterlambatan': 0,
+                    'denda_kondisi': 0,
+                    'return_condition': item.get('return_condition'),
+                    'returned_via': item.get('returned_via'),
+                })
+
+            active_count = l.get('active_items', 0)
+            total_count = l.get('total_items', 0)
+            if active_count == 0:
+                status_str = 'Selesai'
+            elif active_count < total_count:
+                status_str = 'Sebagian'
+            else:
+                status_str = 'Dipinjam'
+
+            first_due = raw_items[0]['due_at'] if raw_items else None
+            due_school_str = format_school_date(first_due) if first_due else '-'
+            tgl_pinjam_school_str = format_school_date(l['created_at'])
+
+            is_overdue = False
+            durasi_terlambat = 0
+            if active_count > 0 and first_due:
+                is_overdue, overdue_days, _ = check_overdue(now_utc(), first_due)
+                if is_overdue:
+                    durasi_terlambat = overdue_days
+
+            first_judul = mapped_items[0]['judul'] if mapped_items else 'Tanpa Buku'
+
+            peminjaman_final.append({
+                'id': l['id'],
+                'kode_transaksi': l.get('idempotency_key') or l['id'],
+                'id_anggota': l.get('peminjam_display_name') or 'Anggota',
+                'tipe_user': l.get('member_status') or 'Siswa',
+                'kelas': '-',
+                'jurusan': '-',
+                'tgl_pinjam': tgl_pinjam_school_str,
+                'tgl_kembali_seharusnya': due_school_str,
+                'tgl_dikembalikan': None,
+                'status': status_str,
+                'total_denda': 0,
+                'denda': 0,
+                'terlambat': is_overdue,
+                'durasi_terlambat': durasi_terlambat,
+                'buku_list': mapped_items,
+                'items': mapped_items,
+                'total_item': total_count,
+                'item_dipinjam': active_count,
+                'id_buku': mapped_items[0]['id_buku'] if mapped_items else None,
+                'judul': first_judul,
+                'cover_img': None,
+            })
+        conn.close()
+        return render_template('peminjaman.html', peminjaman=peminjaman_final)
+
+    has_detail = conn.execute(
+        "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='peminjaman_detail'"
+    ).fetchone()[0] > 0
 
     if not has_detail:
         # Fallback jika database belum dimigrasikan
@@ -1397,6 +1506,45 @@ def proses_pinjam_admin():
 
     conn = get_db_connection()
     try:
+        schema_ver = detect_schema_version(conn)
+        if schema_ver == 'v2':
+            # Resolve member ID
+            resolved_member_id = id_anggota
+            if not member_repo.exists_by_id(conn, id_anggota):
+                matched_members = member_repo.list_members(conn, search=id_anggota)
+                if len(matched_members) == 1:
+                    resolved_member_id = matched_members[0]['id']
+                elif len(matched_members) > 1:
+                    exact = [m for m in matched_members if m['nama'].lower() == id_anggota.lower()]
+                    if len(exact) == 1:
+                        resolved_member_id = exact[0]['id']
+
+            # Resolve copy IDs
+            resolved_copy_ids = []
+            for reg in all_regs:
+                cp = copy_repo.get_copy_by_id(conn, reg)
+                if not cp:
+                    cp = copy_repo.get_copy_by_legacy_ref(conn, reg)
+                if not cp:
+                    row_call = conn.execute("SELECT * FROM copies WHERE call_number = ?;", (reg,)).fetchone()
+                    if row_call:
+                        cp = dict(row_call)
+                if cp:
+                    resolved_copy_ids.append(cp['id'])
+                else:
+                    resolved_copy_ids.append(reg)
+
+            admin_actor = session.get('admin_username') or session.get('username') or 'admin'
+            borrow_copies(
+                conn,
+                member_id=resolved_member_id,
+                copy_ids=resolved_copy_ids,
+                actor=admin_actor,
+                loan_hours=durasi_pinjam * 24
+            )
+            flash(f'Transaksi sirkulasi berhasil dibuat untuk {len(resolved_copy_ids)} buku!', 'success')
+            return redirect(default_redirect)
+
         # Cek ketersediaan buku secara in-memory untuk validasi atomik
         semua_buku = conn.execute('SELECT * FROM buku WHERE stok > 0').fetchall()
 
@@ -1496,15 +1644,18 @@ def proses_pinjam_admin():
 
         conn.commit()
         flash(f'Transaksi sirkulasi berhasil dibuat untuk {len(matched_items)} buku!', 'success')
+    except (MemberNotFoundError, MemberInactiveError, CopyNotFoundError, CopyNotAvailableError, ValidationError, InvalidOperationError) as e:
+        flash(f'Peminjaman dibatalkan! {str(e)}', 'danger')
     except sqlite3.Error as e:
-        conn.rollback()
+        if conn.in_transaction:
+            conn.rollback()
         flash(f'Gagal memproses sirkulasi: {str(e)}', 'danger')
     finally:
         conn.close()
 
     return redirect(default_redirect)
 
-@app.route('/kembalikan_item/<int:detail_id>', methods=['POST'])
+@app.route('/kembalikan_item/<detail_id>', methods=['POST'])
 def proses_kembalikan_item(detail_id):
     if not session.get('logged_in'):
         flash('Akses ditolak!', 'danger')
@@ -1519,6 +1670,32 @@ def proses_kembalikan_item(detail_id):
 
     conn = get_db_connection()
     try:
+        schema_ver = detect_schema_version(conn)
+        if schema_ver == 'v2':
+            admin_actor = session.get('admin_username') or session.get('username') or 'admin'
+            id_str = str(detail_id).strip()
+            if status_kembali in ['Rusak', 'Hilang']:
+                replacement_type = request.form.get('catatan_penggantian') or request.form.get('replacement_type') or 'Kamus / Al-Qur\'an'
+                notes = request.form.get('notes') or f"Status: {status_kembali}"
+                resolve_lost_or_damaged(
+                    conn,
+                    item_id=id_str,
+                    replacement_type=replacement_type,
+                    notes=notes,
+                    actor=admin_actor
+                )
+                flash(f"Buku (Item ID: {id_str}) berhasil diproses ({status_kembali}) dengan kewajiban penggantian fisik (DEC-024).", 'success')
+            else:
+                return_copies(
+                    conn,
+                    item_ids=[id_str],
+                    return_condition='baik',
+                    returned_via='manual',
+                    actor=admin_actor
+                )
+                flash(f"Buku (Item ID: {id_str}) berhasil diproses ({status_kembali})!", 'success')
+            return redirect(url_for('daftar_peminjaman'))
+
         conn.execute("BEGIN TRANSACTION")
 
         item = conn.execute('''
@@ -1611,15 +1788,20 @@ def proses_kembalikan_item(detail_id):
 
         conn.commit()
         flash(f"Buku (Reg: {item['no_registrasi']}) berhasil diproses ({status_kembali})!", 'success')
+    except LoanItemAlreadyReturnedError as e:
+        flash(str(e), 'warning')
+    except (LoanItemNotFoundError, CopyNotAvailableError, ValidationError, InvalidOperationError) as e:
+        flash(f'Gagal memproses pengembalian: {str(e)}', 'danger')
     except sqlite3.Error as e:
-        conn.rollback()
+        if conn.in_transaction:
+            conn.rollback()
         flash(f'Gagal memproses pengembalian: {str(e)}', 'danger')
     finally:
         conn.close()
 
     return redirect(url_for('daftar_peminjaman'))
 
-@app.route('/kembalikan/<int:pinjam_id>', methods=['POST'])
+@app.route('/kembalikan/<pinjam_id>', methods=['POST'])
 def proses_kembalikan(pinjam_id):
     if not session.get('logged_in'):
         flash('Akses ditolak!', 'danger')
@@ -1634,6 +1816,43 @@ def proses_kembalikan(pinjam_id):
 
     conn = get_db_connection()
     try:
+        schema_ver = detect_schema_version(conn)
+        if schema_ver == 'v2':
+            loan_id_str = str(pinjam_id).strip()
+            loan = loan_repo.get_loan_with_items(conn, loan_id_str)
+            if not loan:
+                flash(f"Transaksi peminjaman '{loan_id_str}' tidak ditemukan!", 'danger')
+                return redirect(url_for('daftar_peminjaman'))
+
+            active_items = [it['id'] for it in loan.get('items', []) if it.get('returned_at') is None]
+            if not active_items:
+                flash('Seluruh item pada transaksi ini sudah pernah dikembalikan/diproses sebelumnya.', 'warning')
+                return redirect(url_for('daftar_peminjaman'))
+
+            admin_actor = session.get('admin_username') or session.get('username') or 'admin'
+            if status_kembali in ['Rusak', 'Hilang']:
+                replacement_type = request.form.get('catatan_penggantian') or request.form.get('replacement_type') or 'Kamus / Al-Qur\'an'
+                notes = request.form.get('notes') or f"Status: {status_kembali}"
+                for iid in active_items:
+                    resolve_lost_or_damaged(
+                        conn,
+                        item_id=iid,
+                        replacement_type=replacement_type,
+                        notes=notes,
+                        actor=admin_actor
+                    )
+                flash(f'Berhasil memproses penyelesaian seluruh buku ({len(active_items)} item) dengan status {status_kembali} (DEC-024)!', 'success')
+            else:
+                return_copies(
+                    conn,
+                    item_ids=active_items,
+                    return_condition='baik',
+                    returned_via='manual',
+                    actor=admin_actor
+                )
+                flash(f'Berhasil memproses pengembalian seluruh buku ({len(active_items)} item) dengan status {status_kembali}!', 'success')
+            return redirect(url_for('daftar_peminjaman'))
+
         has_detail = conn.execute(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='peminjaman_detail'"
         ).fetchone()[0] > 0
@@ -1771,9 +1990,38 @@ def proses_kembalikan(pinjam_id):
                 ''', (tgl_sekarang_str, status_final, total_denda, pinjam_id))
                 conn.commit()
                 flash(f'Berhasil memproses pengembalian ({status_kembali})!', 'success')
-    except sqlite3.Error as e:
-        conn.rollback()
+    except (LoanItemAlreadyReturnedError, LoanItemNotFoundError, CopyNotAvailableError, ValidationError, InvalidOperationError) as e:
         flash(f'Gagal memproses pengembalian: {str(e)}', 'danger')
+    except sqlite3.Error as e:
+        if conn.in_transaction:
+            conn.rollback()
+        flash(f'Gagal memproses pengembalian: {str(e)}', 'danger')
+    finally:
+        conn.close()
+
+    return redirect(url_for('daftar_peminjaman'))
+
+@app.route('/perpanjang_item/<detail_id>', methods=['POST'])
+def proses_perpanjang_item(detail_id):
+    if not session.get('logged_in'):
+        flash('Akses ditolak!', 'danger')
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    try:
+        schema_ver = detect_schema_version(conn)
+        if schema_ver == 'v2':
+            actor = session.get('admin_username') or session.get('username') or 'admin'
+            extend_loan(conn, item_id=str(detail_id).strip(), actor=actor)
+            flash('Masa pinjam berhasil diperpanjang 7 hari (DEC-005)!', 'success')
+        else:
+            flash('Fitur perpanjangan per-item hanya tersedia pada Schema v2.', 'warning')
+    except LoanExtensionLimitReachedError as e:
+        flash(str(e), 'warning')
+    except (LoanItemNotFoundError, LoanItemAlreadyReturnedError, ValidationError, InvalidOperationError) as e:
+        flash(f'Gagal memperpanjang peminjaman: {str(e)}', 'danger')
+    except sqlite3.Error as e:
+        flash(f'Gagal memperpanjang peminjaman: {str(e)}', 'danger')
     finally:
         conn.close()
 

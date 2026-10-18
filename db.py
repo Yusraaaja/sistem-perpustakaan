@@ -29,9 +29,6 @@ def detect_schema_version(conn: sqlite3.Connection) -> str:
     cursor = conn.cursor()
     tables = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
 
-    if "peminjaman_detail" not in tables:
-        return "v1"
-
     # Cek apakah skema v2 sudah terpasang
     if "catalog_titles" in tables and "copies" in tables and "loan_items" in tables:
         if "schema_version" in tables:
@@ -39,6 +36,9 @@ def detect_schema_version(conn: sqlite3.Connection) -> str:
             if row and row[0] is not None and row[0] >= 2:
                 return "v2"
         return "v2"
+
+    if "peminjaman_detail" not in tables:
+        return "v1"
 
     return "P1"
 
