@@ -14,9 +14,14 @@ env/
 !.env.example
 
 # Local databases / backups
+*.db
+*.sqlite
+*.sqlite3
 *.db.bak*
 *.sqlite.bak*
 *.sqlite3.bak*
+backups/
+scratch/
 
 # IDE / editor
 .vscode/
@@ -33,3 +38,4 @@ htmlcov/
 
 # Local AI/tool caches
 .kilo/
+DO NOT TOUCH THIS/

@@ -7,7 +7,7 @@
         <h4 class="page-title mb-1">Log Sirkulasi & Peminjaman</h4>
         <p class="text-muted small mb-0">Manajemen sirkulasi buku, pelacakan tenggat waktu pengembalian, dan denda keterlambatan</p>
     </div>
-    
+
     <div class="d-flex flex-wrap align-items-center gap-2">
         {% if session.get('logged_in') %}
         <a href="/export_peminjaman" class="btn btn-success btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm rounded-3">
@@ -31,8 +31,8 @@
             <span class="input-group-text bg-white border-end-0 text-muted ps-3 pe-2" style="border-color: #E2E8F0;">
                 <i class="bi bi-search"></i>
             </span>
-            <input type="text" id="inputCariPeminjam" class="form-control border-start-0 py-2 fw-medium" 
-                   placeholder="Cari peminjam, kelas, atau judul buku..." 
+            <input type="text" id="inputCariPeminjam" class="form-control border-start-0 py-2 fw-medium"
+                   placeholder="Cari peminjam, kelas, atau judul buku..."
                    style="border-color: #E2E8F0; font-size: 0.8125rem;">
         </div>
     </div>
@@ -88,18 +88,36 @@
                             </div>
                         </td>
                         <td class="py-3">
-                            <div class="fw-semibold text-dark mb-1 text-truncate" style="max-width: 250px; font-size: 0.875rem;" title="{{ p.judul }}">
-                                {% if p.id_buku %}
-                                <a href="/buku/{{ p.id_buku }}" class="text-dark text-decoration-none hover-primary">
-                                    {{ p.judul if p.judul else 'Buku Tidak Diketahui' }}
-                                </a>
-                                {% else %}
-                                    {{ p.judul if p.judul else 'Buku Tidak Diketahui' }}
-                                {% endif %}
-                            </div>
-                            <span class="badge font-monospace" style="background-color: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; font-size: 0.72rem; padding: 2px 6px;">
-                                ID Buku: {{ p.id_buku }}
-                            </span>
+                            {% if p.buku_list and p.buku_list|length > 1 %}
+                                <div class="d-flex align-items-center gap-1.5 mb-1">
+                                    <span class="badge fw-semibold rounded-pill" style="background-color: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; font-size: 0.72rem; padding: 2px 8px;">
+                                        <i class="bi bi-collection me-1"></i>{{ p.buku_list|length }} Buku
+                                    </span>
+                                    {% if p.kode_transaksi %}
+                                    <span class="badge font-monospace" style="background-color: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; font-size: 0.7rem;">
+                                        {{ p.kode_transaksi }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <div class="fw-medium text-dark small text-truncate" style="max-width: 250px;" title="{{ p.buku_list[0].judul }}">
+                                    {{ p.buku_list[0].judul }} <span class="text-muted" style="font-size: 0.75rem;">(+{{ p.buku_list|length - 1 }} lainnya)</span>
+                                </div>
+                            {% elif p.buku_list and p.buku_list|length == 1 %}
+                                <div class="fw-semibold text-dark mb-1 text-truncate" style="max-width: 250px; font-size: 0.875rem;" title="{{ p.buku_list[0].judul }}">
+                                    {% if p.buku_list[0].id_buku %}
+                                    <a href="/buku/{{ p.buku_list[0].id_buku }}" class="text-dark text-decoration-none hover-primary">
+                                        {{ p.buku_list[0].judul if p.buku_list[0].judul else 'Buku Tidak Diketahui' }}
+                                    </a>
+                                    {% else %}
+                                        {{ p.buku_list[0].judul if p.buku_list[0].judul else 'Buku Tidak Diketahui' }}
+                                    {% endif %}
+                                </div>
+                                <span class="badge font-monospace" style="background-color: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; font-size: 0.72rem; padding: 2px 6px;">
+                                    Reg: {{ p.buku_list[0].no_registrasi if p.buku_list[0].no_registrasi else '-' }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">Tidak ada item</span>
+                            {% endif %}
                         </td>
                         <td class="py-3">
                             {% if p.status == 'Dipinjam' %}
@@ -115,9 +133,20 @@
                                         Dipinjam
                                     </span>
                                 {% endif %}
+                            {% elif p.status == 'Sebagian' %}
+                                <span class="badge rounded-pill fw-semibold" style="background-color: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 0.75rem; padding: 4px 10px;">
+                                    Sebagian Kembali
+                                </span>
+                                <div class="text-muted mt-1" style="font-size: 0.72rem;">
+                                    {{ p.item_kembali }}/{{ p.total_item }} Buku
+                                </div>
+                            {% elif p.status == 'Menunggu Penggantian' %}
+                                <span class="badge rounded-pill fw-semibold" style="background-color: #FFF1F2; color: #9F1239; border: 1px solid #FECDD3; font-size: 0.75rem; padding: 4px 10px;">
+                                    <i class="bi bi-exclamation-octagon-fill me-1"></i>Menunggu Penggantian
+                                </span>
                             {% elif p.status in ['Selesai', 'Kembali'] %}
                                 <span class="badge rounded-pill fw-semibold" style="background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.75rem; padding: 4px 10px;">
-                                    {{ p.status }}
+                                    Selesai
                                 </span>
                             {% elif p.status == 'Rusak' %}
                                 <span class="badge rounded-pill fw-semibold" style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; font-size: 0.75rem; padding: 4px 10px;">
@@ -148,7 +177,7 @@
                         </td>
                         <td class="pe-4 text-end py-3">
                             {% if session.get('logged_in') %}
-                            <button type="button" class="btn btn-sm btn-light border px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 rounded-3 shadow-xs" 
+                            <button type="button" class="btn btn-sm btn-light border px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 rounded-3 shadow-xs"
                                     style="background-color: #FFFFFF; border-color: #E2E8F0 !important; color: #4F46E5; font-size: 0.8125rem;"
                                     data-bs-toggle="modal" data-bs-target="#modalAksi{{ p.id }}">
                                 <i class="bi bi-sliders"></i> Kelola
@@ -162,101 +191,162 @@
                     {% if session.get('logged_in') %}
                     <!-- Modal Aksi Transaksi -->
                     <div class="modal fade" id="modalAksi{{ p.id }}" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
                             <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
                                 <div class="modal-header py-3 px-4" style="background-color: #FFFFFF; border-bottom: 1px solid #E2E8F0;">
-                                    <h6 class="modal-title fw-bold text-dark mb-0">
-                                        <i class="bi bi-sliders me-2 text-primary"></i> Manajemen Status Transaksi
-                                    </h6>
+                                    <div>
+                                        <h6 class="modal-title fw-bold text-dark mb-0">
+                                            <i class="bi bi-sliders me-2 text-primary"></i> Manajemen Transaksi Sirkulasi
+                                        </h6>
+                                        {% if p.kode_transaksi %}
+                                        <small class="text-muted font-monospace">{{ p.kode_transaksi }}</small>
+                                        {% endif %}
+                                    </div>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body p-4">
                                     <!-- Ringkasan Transaksi -->
                                     <div class="p-3 rounded-3 mb-3" style="background-color: #F8FAFC; border: 1px solid #E2E8F0;">
-                                        <div class="d-flex justify-content-between align-items-center mb-1.5">
-                                            <span class="text-muted small">Peminjam:</span>
-                                            <span class="fw-bold text-dark small">{{ p.id_anggota }} ({{ p.tipe_user }})</span>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center mb-1.5">
-                                            <span class="text-muted small">Judul Buku:</span>
-                                            <span class="fw-semibold text-dark small text-truncate" style="max-width: 250px;" title="{{ p.judul }}">{{ p.judul if p.judul else '-' }}</span>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center mb-1.5">
-                                            <span class="text-muted small">Tenggat Waktu:</span>
-                                            <span class="fw-medium text-secondary small">{{ p.tgl_kembali_seharusnya }}</span>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span class="text-muted small">Status / Denda:</span>
-                                            <span class="small">
-                                                <span class="fw-semibold text-dark">{{ p.status }}</span>
-                                                {% if p.denda and p.denda > 0 %}
-                                                <span class="text-danger fw-bold ms-1">(Rp {{ "{:,}".format(p.denda) }})</span>
-                                                {% endif %}
-                                            </span>
+                                        <div class="row g-2">
+                                            <div class="col-sm-6">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted small">Peminjam:</span>
+                                                    <span class="fw-bold text-dark small">{{ p.id_anggota }} ({{ p.tipe_user }})</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted small">Kelas / Jurusan:</span>
+                                                    <span class="fw-semibold text-secondary small">{{ p.kelas }} - {{ p.jurusan }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted small">Tenggat Waktu:</span>
+                                                    <span class="fw-medium text-secondary small">{{ p.tgl_kembali_seharusnya }}</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="text-muted small">Status / Total Denda:</span>
+                                                    <span class="small">
+                                                        <span class="fw-semibold text-dark">{{ p.status }}</span>
+                                                        {% if p.denda and p.denda > 0 %}
+                                                        <span class="text-danger fw-bold ms-1">(Rp {{ "{:,}".format(p.denda) }})</span>
+                                                        {% endif %}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <p class="text-muted small mb-3">Silakan pilih tindakan sirkulasi untuk peminjaman atas nama <strong>{{ p.id_anggota }}</strong>:</p>
-                                    
-                                    {% if p.status == 'Dipinjam' %}
+                                    <!-- Daftar Item Buku dalam Transaksi -->
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="fw-bold text-dark small">
+                                                <i class="bi bi-collection me-1 text-primary"></i> Daftar Buku dalam Transaksi ({{ p.buku_list|length }} Item)
+                                            </span>
+                                            <span class="text-muted small">Status Pengembalian Independen per-Buku</span>
+                                        </div>
+
+                                        <div class="d-flex flex-column gap-2">
+                                            {% for itm in p.buku_list %}
+                                            <div class="p-3 rounded-3 border bg-white shadow-xs">
+                                                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-2">
+                                                    <div>
+                                                        <span class="fw-semibold text-dark small d-block">{{ itm.judul }}</span>
+                                                        <span class="badge font-monospace text-muted" style="background: #F1F5F9; border: 1px solid #E2E8F0; font-size: 0.72rem;">
+                                                            Reg: {{ itm.no_registrasi }}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        {% if itm.status == 'Dipinjam' %}
+                                                            <span class="badge rounded-pill fw-semibold" style="background-color: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 0.72rem;">
+                                                                Dipinjam
+                                                            </span>
+                                                        {% elif itm.status in ['Kembali', 'Selesai'] %}
+                                                            <span class="badge rounded-pill fw-semibold" style="background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.72rem;">
+                                                                Kembali ({{ itm.tgl_dikembalikan or '-' }})
+                                                            </span>
+                                                        {% elif itm.status == 'Rusak' %}
+                                                            <span class="badge rounded-pill fw-semibold" style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; font-size: 0.72rem;">
+                                                                Rusak
+                                                            </span>
+                                                        {% elif itm.status == 'Hilang' %}
+                                                            <span class="badge rounded-pill fw-semibold" style="background-color: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; font-size: 0.72rem;">
+                                                                Hilang
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="badge rounded-pill fw-semibold bg-light text-dark border" style="font-size: 0.72rem;">
+                                                                {{ itm.status }}
+                                                            </span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+
+                                                {% if itm.status == 'Dipinjam' %}
+                                                <div class="d-flex flex-wrap align-items-center gap-2 pt-2 border-top">
+                                                    <span class="text-muted small me-1">Tindakan per item:</span>
+                                                    <form action="/kembalikan_item/{{ itm.id }}" method="POST" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                                        <input type="hidden" name="status_kembali" value="Kembali">
+                                                        <button type="submit" class="btn btn-xs btn-success py-1 px-2.5 fw-semibold rounded-2 shadow-xs d-inline-flex align-items-center gap-1" style="font-size: 0.75rem;">
+                                                            <i class="bi bi-check2"></i> Kembali Normal
+                                                        </button>
+                                                    </form>
+                                                    <form action="/kembalikan_item/{{ itm.id }}" method="POST" onsubmit="return confirm('Konfirmasi buku {{ itm.no_registrasi }} dikembalikan dalam kondisi RUSAK?');" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                                        <input type="hidden" name="status_kembali" value="Rusak">
+                                                        <button type="submit" class="btn btn-xs btn-outline-warning py-1 px-2.5 fw-semibold rounded-2 d-inline-flex align-items-center gap-1" style="font-size: 0.75rem;">
+                                                            <i class="bi bi-exclamation-triangle"></i> Rusak
+                                                        </button>
+                                                    </form>
+                                                    <form action="/kembalikan_item/{{ itm.id }}" method="POST" onsubmit="return confirm('Konfirmasi buku {{ itm.no_registrasi }} dinyatakan HILANG?');" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                                        <input type="hidden" name="status_kembali" value="Hilang">
+                                                        <button type="submit" class="btn btn-xs btn-outline-danger py-1 px-2.5 fw-semibold rounded-2 d-inline-flex align-items-center gap-1" style="font-size: 0.75rem;">
+                                                            <i class="bi bi-x-circle"></i> Hilang
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                                {% else %}
+                                                <div class="d-flex justify-content-between align-items-center pt-2 border-top text-muted small" style="font-size: 0.72rem;">
+                                                    <span><i class="bi bi-clock-history me-1"></i>Tanggal Kembali: {{ itm.tgl_dikembalikan or '-' }}</span>
+                                                    {% if itm.denda_kondisi and itm.denda_kondisi > 0 %}
+                                                    <span class="text-danger fw-semibold">Denda Kondisi: Rp {{ "{:,}".format(itm.denda_kondisi) }}</span>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Tindakan Global Transaksi -->
                                     <div class="d-flex flex-column gap-2 mb-3">
-                                        <form action="/kembalikan/{{ p.id }}" method="POST">
+                                        {% if p.status in ['Dipinjam', 'Sebagian'] %}
+                                        <form action="/kembalikan/{{ p.id }}" method="POST" onsubmit="return confirm('Kembalikan SELURUH buku yang masih dipinjam dalam transaksi ini sekaligus?');">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                             <input type="hidden" name="status_kembali" value="Kembali">
                                             <button type="submit" class="btn btn-success btn-sm w-100 fw-semibold py-2 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2">
-                                                <i class="bi bi-check-circle-fill"></i> Konfirmasi Pengembalian (Normal)
+                                                <i class="bi bi-check-all fs-6"></i> Konfirmasi Pengembalian Semua Sisa Buku (Normal)
                                             </button>
                                         </form>
-                                        
-                                        <form action="/kembalikan/{{ p.id }}" method="POST" onsubmit="return confirm('Konfirmasi pengembalian dengan status buku RUSAK? Denda seharga buku akan diterapkan.');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                            <input type="hidden" name="status_kembali" value="Rusak">
-                                            <button type="submit" class="btn btn-sm w-100 fw-semibold py-2 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2"
-                                                    style="background-color: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;">
-                                                <i class="bi bi-exclamation-triangle-fill"></i> Buku Dikembalikan (Kondisi Rusak)
-                                            </button>
-                                        </form>
-                                        
-                                        <form action="/kembalikan/{{ p.id }}" method="POST" onsubmit="return confirm('Apakah Anda yakin menyatakan buku ini HILANG? Ganti rugi seharga buku akan dibebankan.');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                            <input type="hidden" name="status_kembali" value="Hilang">
-                                            <button type="submit" class="btn btn-sm w-100 fw-semibold py-2 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2"
-                                                    style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FECACA;">
-                                                <i class="bi bi-x-circle-fill"></i> Buku Dinyatakan Hilang
-                                            </button>
-                                        </form>
+                                        {% endif %}
 
+                                        {% if p.denda and p.denda > 0 %}
                                         <form action="/lunasi_denda/{{ p.id }}" method="POST" onsubmit="return confirm('Apakah denda transaksi peminjaman ini sudah diselesaikan/lunas?');">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                             <button type="submit" class="btn btn-sm w-100 fw-semibold py-2 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2"
                                                     style="background-color: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE;">
-                                                <i class="bi bi-cash-coin"></i> Selesaikan & Lunasi Denda
+                                                <i class="bi bi-cash-coin"></i> Selesaikan & Lunasi Denda Transaksi (Rp {{ "{:,}".format(p.denda) }})
                                             </button>
                                         </form>
+                                        {% endif %}
                                     </div>
-                                    {% elif p.status in ['Rusak', 'Hilang'] %}
-                                    <div class="mb-3">
-                                        <form action="/lunasi_denda/{{ p.id }}" method="POST" onsubmit="return confirm('Apakah denda ganti rugi buku ini sudah diselesaikan/lunas?');" class="d-inline">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                            <button type="submit" class="btn btn-success btn-sm fw-semibold py-2 w-100 rounded-3 shadow-xs d-flex align-items-center justify-content-center gap-2">
-                                                <i class="bi bi-check-circle-fill"></i> Konfirmasi Denda Dibayar / Lunas
-                                            </button>
-                                        </form>
-                                    </div>
-                                    {% else %}
-                                        <div class="p-2.5 rounded-3 text-center mb-3" style="background-color: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; font-size: 0.8125rem;">
-                                            <i class="bi bi-check-all me-1"></i> Sirkulasi Selesai (Transaksi Rampung)
-                                        </div>
-                                    {% endif %}
-                                    
+
                                     <hr class="my-3" style="border-color: #E2E8F0;">
-                                    
-                                    <form action="/hapus_peminjaman/{{ p.id }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus log transaksi ini dari riwayat secara permanen?');">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger w-100 py-2 rounded-3 fw-medium d-flex align-items-center justify-content-center gap-2">
-                                            <i class="bi bi-trash3"></i> Hapus Permanen Log Riwayat
-                                        </button>
-                                    </form>
+
+                                    <div class="p-2.5 rounded-3 bg-light text-muted small d-flex align-items-center gap-2" style="border: 1px dashed #CBD5E1; font-size: 0.75rem;">
+                                        <i class="bi bi-shield-check text-primary fs-6"></i>
+                                        <span>Log riwayat transaksi dilindungi permanen untuk audit arsip perpustakaan.</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -297,13 +387,16 @@
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label fw-semibold small mb-1.5 text-dark">Nomor Registrasi Buku Fisik <span class="text-danger">*</span></label>
-                        <input type="text" name="no_registrasi" class="form-control form-control-sm rounded-3 py-2 font-monospace" 
-                               placeholder="Contoh: 00412855" style="border-color: #E2E8F0; font-size: 0.8125rem;" required>
+                        <textarea name="no_registrasi" rows="2" class="form-control form-control-sm rounded-3 py-2 font-monospace"
+                               placeholder="Contoh: 00000101, 00000201 (bisa 1 atau banyak nomor registrasi)" style="border-color: #E2E8F0; font-size: 0.8125rem;" required></textarea>
+                        <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">
+                            * Masukkan satu atau banyak nomor registrasi (pisahkan dengan koma atau baris baru). Sistem akan memvalidasi ketersediaan buku secara otomatis.
+                        </small>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold small mb-1.5 text-dark">Nama Peminjam / Anggota <span class="text-danger">*</span></label>
-                        <input type="text" name="id_anggota" class="form-control form-control-sm rounded-3 py-2" 
+                        <input type="text" name="id_anggota" class="form-control form-control-sm rounded-3 py-2"
                                placeholder="Nama lengkap siswa atau guru" style="border-color: #E2E8F0; font-size: 0.8125rem;" required>
                     </div>
 
@@ -315,7 +408,7 @@
                                 <option value="Guru">Guru / Staf</option>
                             </select>
                         </div>
-                        
+
                         <div class="col-6 mb-3">
                             <label class="form-label fw-semibold small mb-1.5 text-primary">Durasi Pinjam <span class="text-danger">*</span></label>
                             <select name="durasi_pinjam" class="form-select form-select-sm rounded-3 py-2 fw-semibold" style="border-color: #C7D2FE; color: #4F46E5; font-size: 0.8125rem;" required>
@@ -337,17 +430,17 @@
                                 <option value="XII">Kelas 12 (XII)</option>
                             </select>
                         </div>
-                        
+
                         <div class="col-6">
                             <label class="form-label fw-semibold small mb-1.5 text-dark">Jurusan / Divisi <span class="text-danger">*</span></label>
-                            <input type="text" name="jurusan" class="form-control form-control-sm rounded-3 py-2" 
+                            <input type="text" name="jurusan" class="form-control form-control-sm rounded-3 py-2"
                                    placeholder="Contoh: RPL" style="border-color: #E2E8F0; font-size: 0.8125rem;" required>
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer py-2.5 px-4" style="background-color: #F8FAFC; border-top: 1px solid #E2E8F0;">
-                    <button type="button" class="btn btn-sm btn-light border px-3 py-2 rounded-3 text-secondary fw-semibold" 
+                    <button type="button" class="btn btn-sm btn-light border px-3 py-2 rounded-3 text-secondary fw-semibold"
                             style="background-color: #FFFFFF; border-color: #E2E8F0 !important;" data-bs-dismiss="modal">
                         Batal
                     </button>
@@ -367,9 +460,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const filterTable = function() {
             let kataKunci = inputCari.value.toLowerCase().trim();
             let barisTabel = document.querySelectorAll('table tbody tr.border-bottom');
-            
+
             barisTabel.forEach(tr => {
-                let textKonten = tr.textContent.toLowerCase(); 
+                let textKonten = tr.textContent.toLowerCase();
                 if (textKonten.includes(kataKunci)) {
                     tr.style.display = '';
                 } else {
@@ -377,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         };
-        
+
         inputCari.addEventListener('keyup', filterTable);
         inputCari.addEventListener('input', filterTable);
     }
