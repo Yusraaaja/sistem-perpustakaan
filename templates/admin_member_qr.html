@@ -1,0 +1,276 @@
+{% extends 'layout.html' %}
+
+{% block title %}Kartu & QR Anggota {{ member.id }} - Sistem Perpustakaan Digital{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+
+        <!-- Breadcrumb & Header Halaman -->
+        <div class="mb-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2 small">
+                    <li class="breadcrumb-item"><a href="/koleksi" class="text-decoration-none">Koleksi</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_members') }}" class="text-decoration-none">Kelola Anggota</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Kartu & QR Anggota</li>
+                </ol>
+            </nav>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-1">Kartu & Token QR Anggota</h2>
+                    <p class="text-muted small mb-0">
+                        Pratinjau kartu anggota perpustakaan, kode QR SVG kriptografis, dan fasilitas pencabutan & penerbitan ulang QR (Task 4-07, LIB-QR-001).
+                    </p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge rounded-pill bg-light text-dark border px-3 py-2 font-monospace fs-7">
+                        <i class="bi bi-person-badge me-1 text-primary"></i> {{ member.id }}
+                    </span>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 small font-monospace">
+                        <i class="bi bi-qr-code me-1"></i> Versi QR: v{{ qr_data.qr_version }}
+                    </span>
+                    {% if member.status == 'aktif' %}
+                    <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 small">
+                        <i class="bi bi-check-circle-fill me-1"></i> Aktif
+                    </span>
+                    {% else %}
+                    <span class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-2 small">
+                        <i class="bi bi-dash-circle-fill me-1"></i> Nonaktif
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Banner Kebijakan Kriptografi & Privasi (DEC-010, DEC-023, LIB-QR-001) -->
+        <div class="alert alert-info border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #E0F2FE; color: #0369A1; width: 42px; height: 42px; flex-shrink: 0;">
+                    <i class="bi bi-shield-lock-fill fs-4"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Keamanan Kriptografis & Privasi (DEC-010, DEC-023)</h6>
+                    <p class="small text-secondary mb-0" style="line-height: 1.55;">
+                        Kode QR di bawah ini menggunakan format tanda tangan <strong>HMAC-SHA256</strong> kanonikal (<code>member_id:qr_version:signature</code>).
+                        <strong>Tanpa kebocoran data pribadi (Zero PII)</strong>: teks QR tidak memuat nama, kelas, atau nomor telepon.
+                        Menerbitkan ulang QR akan menaikkan <code>qr_version</code> sebesar +1, yang secara instan membatalkan seluruh token fisik lama tanpa menghapus riwayat peminjaman buku anggota.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {% if error_message %}
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 p-3 mb-4">
+            <div class="d-flex align-items-center gap-2 text-danger">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span class="small fw-semibold">{{ error_message }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row g-4 mb-4">
+            <!-- Kartu Fisik Digital Preview -->
+            <div class="col-lg-6">
+                <div class="card border rounded-4 shadow-sm h-100 overflow-hidden" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: white;">
+                    <div class="card-body p-4 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-start border-bottom border-secondary pb-3 mb-3">
+                                <div>
+                                    <div class="text-uppercase tracking-wider text-info fw-bold small mb-1" style="letter-spacing: 1px;">
+                                        Perpustakaan Digital Sekolah
+                                    </div>
+                                    <h5 class="fw-bold mb-0 text-white">KARTU ANGGOTA</h5>
+                                </div>
+                                <div class="badge bg-primary text-white font-monospace px-2 py-1">
+                                    v{{ qr_data.qr_version }}
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="text-secondary small">Nama Anggota</div>
+                                <div class="fs-5 fw-bold text-white">{{ member.nama }}</div>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <div class="text-secondary small">ID Anggota</div>
+                                    <div class="font-monospace fw-bold text-info fs-6">{{ member.id }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-secondary small">Status Akun</div>
+                                    <div>
+                                        {% if member.status == 'aktif' %}
+                                        <span class="badge bg-success text-white px-2 py-1 small">Aktif</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary text-white px-2 py-1 small">Nonaktif</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="text-secondary small">Kategori Peran</div>
+                                <div class="text-light small fw-medium">
+                                    {{ member.category_jenis | replace('_', ' ') | title if member.category_jenis else member.category_id }}
+                                    {% if member.category_keterangan %}
+                                    <span class="text-secondary">({{ member.category_keterangan }})</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Area Tampilan QR SVG -->
+                        <div class="text-center bg-white p-3 rounded-3 mt-3 shadow-sm mx-auto" style="max-width: 220px;">
+                            <div class="qr-svg-container" style="line-height: 0;">
+                                {{ qr_data.qr_svg | safe }}
+                            </div>
+                            <div class="text-dark small font-monospace mt-2 fw-semibold" style="font-size: 0.75rem;">
+                                {{ member.id }} · v{{ qr_data.qr_version }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-black bg-opacity-25 border-top border-secondary py-2 px-4 small text-secondary d-flex justify-content-between align-items-center">
+                        <span>Sistem Otentikasi Terdesentralisasi</span>
+                        <span class="font-monospace">HMAC-SHA256</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Cabut & Terbitkan Ulang QR (Task 4-07) -->
+            <div class="col-lg-6">
+                <div class="card border rounded-4 shadow-sm h-100">
+                    <div class="card-header bg-white py-3 px-4 border-bottom">
+                        <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                            <i class="bi bi-arrow-repeat text-warning"></i> Cabut & Terbitkan Ulang QR (Task 4-07)
+                        </h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="alert alert-warning border-0 p-3 rounded-3 mb-3 small">
+                            <div class="d-flex gap-2">
+                                <i class="bi bi-exclamation-triangle-fill fs-5 text-warning flex-shrink-0"></i>
+                                <div>
+                                    <strong>Perhatian Penting:</strong>
+                                    Tindakan ini akan menaikkan versi token QR dari <strong>v{{ qr_data.qr_version }}</strong> menjadi <strong>v{{ qr_data.qr_version + 1 }}</strong>.
+                                    Kartu fisik lama yang beredar akan <em>seketika ditolak</em> oleh sistem peminjaman (LIB-QR-001).
+                                    Riwayat peminjaman buku tetap aman dan anggota tidak dihapus.
+                                </div>
+                            </div>
+                        </div>
+
+                        <form method="POST" action="{{ url_for('admin_member_reissue_qr', member_id=member.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ session.get('_csrf_token') }}">
+
+                            <div class="mb-3">
+                                <label for="reissue_reason" class="form-label fw-semibold text-dark small">
+                                    Alasan Pencabutan & Penerbitan Ulang <span class="text-danger">*</span>
+                                </label>
+                                <textarea name="reason" 
+                                          id="reissue_reason" 
+                                          rows="4" 
+                                          class="form-control form-control-sm" 
+                                          placeholder="Tuliskan alasan resmi pencabutan & penerbitan kartu baru (contoh: Kartu fisik hilang dilaporkan oleh wali kelas / Kartu fisik patah / Permintaan cetak ulang)..." 
+                                          minlength="5" 
+                                          maxlength="500" 
+                                          required>{{ reason or '' }}</textarea>
+                                <div class="form-text small text-muted">
+                                    Wajib diisi antara 5 hingga 500 karakter. Alasan akan dicatat permanen dalam audit log sistem.
+                                </div>
+                            </div>
+
+                            <div class="mb-3 p-3 bg-light rounded-3 border">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="confirm_reissue" required>
+                                    <label class="form-check-label small text-secondary" for="confirm_reissue">
+                                        Saya mengonfirmasi bahwa kartu fisik lama milik <strong>{{ member.nama }}</strong> ({{ member.id }}) akan dicabut dan digantikan dengan token versi baru (v{{ qr_data.qr_version + 1 }}).
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-warning fw-semibold px-3 d-inline-flex align-items-center gap-1">
+                                    <i class="bi bi-arrow-repeat"></i> Cabut & Terbitkan Ulang QR
+                                </button>
+                                <a href="{{ url_for('admin_member_status', member_id=member.id) }}" class="btn btn-outline-secondary px-3">
+                                    <i class="bi bi-sliders me-1"></i> Kelola Status
+                                </a>
+                                <a href="{{ url_for('admin_members') }}" class="btn btn-outline-secondary px-3">
+                                    Kembali ke Daftar
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Riwayat Catatan Audit Anggota (audit_log) -->
+        <div class="card border rounded-3 shadow-xs overflow-hidden mb-4">
+            <div class="card-header bg-white py-3 px-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-journal-text text-primary"></i> Jejak Audit Anggota (audit_log)
+                </h6>
+                <span class="badge bg-light text-dark border small">Total: {{ audits | length }} entri</span>
+            </div>
+            <div class="card-body p-0">
+                {% if audits and audits | length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light text-secondary text-uppercase" style="font-size: 0.75rem;">
+                            <tr>
+                                <th style="width: 170px;">Waktu (UTC)</th>
+                                <th style="width: 150px;">Aksi</th>
+                                <th style="width: 130px;">Aktor</th>
+                                <th>Alasan Perubahan</th>
+                                <th>Rincian Versi / Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in audits %}
+                            <tr>
+                                <td class="font-monospace text-muted">{{ a.at[:19] if a.at else '-' }}</td>
+                                <td>
+                                    {% if a.action == 'MEMBER_QR_REISSUE' %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle fw-medium px-2 py-1">
+                                        <i class="bi bi-qr-code me-1"></i> QR Terbit Ulang
+                                    </span>
+                                    {% elif a.action == 'MEMBER_DEACTIVATE' %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-medium px-2 py-1">
+                                        <i class="bi bi-person-x me-1"></i> Dinonaktifkan
+                                    </span>
+                                    {% elif a.action == 'MEMBER_REACTIVATE' %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle fw-medium px-2 py-1">
+                                        <i class="bi bi-person-check me-1"></i> Diaktifkan
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-light text-dark border fw-medium px-2 py-1">
+                                        {{ a.action }}
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td><span class="fw-medium text-dark">{{ a.actor }}</span></td>
+                                <td class="text-secondary">{{ a.reason or '-' }}</td>
+                                <td class="font-monospace small text-muted">
+                                    {% if a.detail_json %}
+                                        {{ a.detail_json }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted small">
+                    <i class="bi bi-clock-history fs-3 d-block mb-1 text-secondary opacity-50"></i>
+                    Belum ada riwayat perubahan status atau penerbitan ulang QR untuk anggota ini.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+

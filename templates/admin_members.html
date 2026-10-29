@@ -1,0 +1,341 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3">
+    <!-- Header Halaman -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge rounded-pill fw-medium" style="background-color: #E0E7FF; color: #3730A3; font-size: 0.75rem; padding: 4px 10px;">
+                    Task 4-02: Manajemen Anggota
+                </span>
+                <h4 class="page-title mb-0">Daftar & Pencarian Anggota</h4>
+            </div>
+            <p class="text-muted small mb-0">
+                Pusat data anggota perpustakaan: murid berdasarkan jurusan, guru kejuruan, guru umum, staf, dan teknisi (DEC-023: Tanpa kelas & telepon).
+            </p>
+        </div>
+        
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="{{ url_for('unduh_template_impor_anggota') }}" class="btn btn-outline-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
+                <i class="bi bi-file-earmark-arrow-down"></i> Unduh Template
+            </a>
+            <a href="{{ url_for('panduan_impor_anggota') }}" class="btn btn-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Panduan Impor
+            </a>
+            <a href="/peminjaman" class="btn btn-outline-secondary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
+                <i class="bi bi-person-lines-fill"></i> Sirkulasi Peminjaman
+            </a>
+            <a href="/koleksi" class="btn btn-light border px-3 py-2 fw-semibold text-secondary d-inline-flex align-items-center gap-1.5 shadow-xs" style="background-color: #FFFFFF; border-color: #E2E8F0 !important;">
+                <i class="bi bi-database"></i> Katalog Buku
+            </a>
+        </div>
+    </div>
+
+    {% if is_legacy %}
+    <!-- Peringatan Skema Legacy P1 -->
+    <div class="alert alert-warning border border-warning-subtle rounded-3 shadow-xs p-3 mb-4">
+        <div class="d-flex gap-3">
+            <div class="fs-4 text-warning mt-0"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            <div>
+                <div class="fw-semibold text-dark mb-1">Database Berada pada Skema Lama (P1)</div>
+                <p class="small text-secondary mb-0">
+                    Fitur manajemen anggota perpustakaan resmi (tabel <code>members</code> dan <code>member_categories</code>) hanya tersedia pada database skema v2. Jalankan migrasi v2 untuk mengaktifkan fitur keanggotaan terpusat.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% else %}
+
+    <!-- Metric Cards Ringkasan Anggota -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 rounded-3 shadow-xs h-100 p-3" style="background-color: #F8FAFC; border: 1px solid #E2E8F0 !important;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small fw-medium mb-1">Total Anggota</div>
+                        <div class="fs-4 fw-bold text-dark">{{ metrics.total_anggota }}</div>
+                    </div>
+                    <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background-color: #EFF6FF; color: #2563EB;">
+                        <i class="bi bi-people-fill fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 rounded-3 shadow-xs h-100 p-3" style="background-color: #F8FAFC; border: 1px solid #E2E8F0 !important;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small fw-medium mb-1">Anggota Aktif</div>
+                        <div class="fs-4 fw-bold text-success">{{ metrics.total_aktif }}</div>
+                    </div>
+                    <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background-color: #ECFDF5; color: #059669;">
+                        <i class="bi bi-person-check-fill fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 rounded-3 shadow-xs h-100 p-3" style="background-color: #F8FAFC; border: 1px solid #E2E8F0 !important;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small fw-medium mb-1">Anggota Nonaktif</div>
+                        <div class="fs-4 fw-bold text-secondary">{{ metrics.total_nonaktif }}</div>
+                    </div>
+                    <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background-color: #F1F5F9; color: #64748B;">
+                        <i class="bi bi-person-x-fill fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 rounded-3 shadow-xs h-100 p-3" style="background-color: #F8FAFC; border: 1px solid #E2E8F0 !important;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small fw-medium mb-1">Total Kategori</div>
+                        <div class="fs-4 fw-bold text-primary">{{ metrics.total_kategori }}</div>
+                    </div>
+                    <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background-color: #EEF2FF; color: #4F46E5;">
+                        <i class="bi bi-tags-fill fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Pencarian Bar -->
+    <div class="bg-white border rounded-3 p-3 mb-4 shadow-xs">
+        <form method="GET" action="{{ url_for('admin_members') }}" class="row g-2 align-items-center">
+            <div class="col-12 col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0 text-muted">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" 
+                           name="q" 
+                           class="form-control border-start-0 ps-0" 
+                           placeholder="Cari nama atau ID anggota (misal: M-3K9X7W)..." 
+                           value="{{ query }}"
+                           maxlength="100">
+                </div>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <select name="category_id" class="form-select">
+                    <option value="">Semua Kategori</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if category_id == cat.id %}selected{% endif %}>
+                        {{ cat.jenis | replace('_', ' ') | title }} ({{ cat.id }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-6 col-md-2">
+                <select name="status" class="form-select">
+                    <option value="">Semua Status</option>
+                    <option value="aktif" {% if status == 'aktif' %}selected{% endif %}>Aktif</option>
+                    <option value="nonaktif" {% if status == 'nonaktif' %}selected{% endif %}>Nonaktif</option>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-xs">
+                    <i class="bi bi-filter"></i> Filter
+                </button>
+                {% if query or category_id or status %}
+                <a href="{{ url_for('admin_members') }}" class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center" title="Reset Pencarian">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabel Daftar Anggota -->
+    <div class="card border rounded-3 shadow-xs overflow-hidden mb-3">
+        <div class="card-header bg-white py-3 px-3 d-flex justify-content-between align-items-center border-bottom">
+            <div class="fw-semibold text-dark">
+                Daftar Anggota 
+                <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1 font-monospace">
+                    {{ total }} data
+                </span>
+            </div>
+            {% if query or category_id or status %}
+            <div class="small text-muted">
+                Filter aktif: 
+                {% if query %}<strong>"{{ query }}"</strong>{% endif %}
+                {% if category_id %}<span class="badge bg-light text-dark border ms-1">{{ category_id }}</span>{% endif %}
+                {% if status %}<span class="badge bg-light text-dark border ms-1">{{ status }}</span>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if members and members | length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light text-secondary small text-uppercase">
+                    <tr>
+                        <th style="width: 60px;" class="text-center">No</th>
+                        <th style="width: 140px;">ID Anggota</th>
+                        <th>Nama Anggota</th>
+                        <th style="width: 220px;">Kategori</th>
+                        <th style="width: 120px;" class="text-center">Status Akun</th>
+                        <th style="width: 100px;" class="text-center">Versi QR</th>
+                        <th style="width: 160px;">Terdaftar</th>
+                        <th style="width: 140px;" class="text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in members %}
+                    <tr>
+                        <td class="text-center text-muted small">
+                            {{ (page - 1) * per_page + loop.index }}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
+                               class="badge bg-light text-dark border font-monospace px-2 py-1 text-decoration-none" 
+                               style="font-size: 0.85rem;"
+                               title="Lihat status & riwayat audit">
+                                {{ m.id }}
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
+                               class="fw-semibold text-dark text-decoration-none"
+                               title="Kelola status anggota">
+                                {{ m.nama }}
+                            </a>
+                        </td>
+                        <td>
+                            <div>
+                                <span class="badge rounded-pill fw-medium" style="background-color: #F1F5F9; color: #334155; font-size: 0.75rem;">
+                                    {{ m.category_jenis | replace('_', ' ') | title }}
+                                </span>
+                            </div>
+                            {% if m.category_keterangan %}
+                            <div class="text-muted text-truncate" style="font-size: 0.75rem; max-width: 220px;" title="{{ m.category_keterangan }}">
+                                {{ m.category_keterangan }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if m.status == 'aktif' %}
+                            <span class="badge rounded-pill bg-success-subtle text-success fw-semibold px-2 py-1" style="font-size: 0.75rem;">
+                                <i class="bi bi-check-circle-fill me-0.5"></i> Aktif
+                            </span>
+                            {% else %}
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary fw-semibold px-2 py-1" style="font-size: 0.75rem;">
+                                <i class="bi bi-dash-circle-fill me-0.5"></i> Nonaktif
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{{ url_for('admin_member_qr', member_id=m.id) }}" 
+                               class="badge bg-secondary-subtle text-secondary font-monospace text-decoration-none" 
+                               style="font-size: 0.75rem;" 
+                               title="Lihat kartu QR / Terbitkan ulang">
+                                v{{ m.qr_version }}
+                            </a>
+                        </td>
+                        <td class="small text-muted">
+                            {{ m.created_at[:10] if m.created_at else '-' }}
+                        </td>
+                        <td class="text-center text-nowrap">
+                            {% if m.status == 'aktif' %}
+                            <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
+                               class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 py-0 px-2"
+                               title="Nonaktifkan akun anggota ini">
+                                <i class="bi bi-person-x"></i> Nonaktifkan
+                            </a>
+                            {% else %}
+                            <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
+                               class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 py-0 px-2"
+                               title="Aktifkan kembali akun anggota ini">
+                                <i class="bi bi-person-check"></i> Aktifkan
+                            </a>
+                            {% endif %}
+                            <a href="{{ url_for('admin_member_qr', member_id=m.id) }}" 
+                               class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 py-0 px-2 ms-1"
+                               title="Lihat kartu QR & fasilitas penerbitan ulang">
+                                <i class="bi bi-qr-code"></i> QR
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginasi -->
+        {% if total_pages > 1 %}
+        <div class="card-footer bg-white py-3 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2 border-top">
+            <div class="small text-muted">
+                Menampilkan halaman <strong>{{ page }}</strong> dari <strong>{{ total_pages }}</strong> (Total {{ total }} anggota)
+            </div>
+            <nav aria-label="Navigasi halaman anggota">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item {% if not has_prev %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin_members', q=query, category_id=category_id, status=status, page=page-1) }}">
+                            <i class="bi bi-chevron-left"></i> Sebelumnya
+                        </a>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">{{ page }} / {{ total_pages }}</span>
+                    </li>
+                    <li class="page-item {% if not has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin_members', q=query, category_id=category_id, status=status, page=page+1) }}">
+                            Berikutnya <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <!-- Keadaan Kosong (Empty State) -->
+        <div class="text-center py-5 px-3">
+            <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px; background-color: #F1F5F9; color: #94A3B8;">
+                <i class="bi bi-people fs-2"></i>
+            </div>
+            {% if query or category_id or status %}
+            <h5 class="fw-semibold text-dark mb-1">Anggota Tidak Ditemukan</h5>
+            <p class="text-muted small mb-3">
+                Tidak ada anggota yang cocok dengan kata kunci atau filter yang Anda pilih.
+            </p>
+            <a href="{{ url_for('admin_members') }}" class="btn btn-outline-primary btn-sm px-3 fw-semibold">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset Filter
+            </a>
+            {% else %}
+            <h5 class="fw-semibold text-dark mb-1">Belum Ada Data Anggota</h5>
+            <p class="text-muted small mb-0">
+                Belum ada anggota perpustakaan yang terdaftar di basis data. Data anggota dapat diimpor melalui file Excel/CSV pada tahapan berikutnya.
+            </p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Ringkasan Kategori Referensi -->
+    <div class="card border rounded-3 shadow-xs p-3 bg-light">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-info-circle text-primary"></i>
+            <span class="fw-semibold small text-dark">Distribusi Kategori Keanggotaan Sekolah (Task 4-02):</span>
+        </div>
+        <div class="row g-2">
+            {% for cat in metrics.kategori_breakdown %}
+            <div class="col-12 col-sm-6 col-lg">
+                <div class="bg-white border rounded p-2 text-center">
+                    <div class="text-muted" style="font-size: 0.72rem;">{{ cat.jenis | replace('_', ' ') | title }}</div>
+                    <div class="fw-bold fs-6 text-dark">{{ cat.member_count }} <span class="fw-normal text-muted" style="font-size: 0.75rem;">anggota</span></div>
+                    <div class="text-muted font-monospace" style="font-size: 0.68rem;">{{ cat.id }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
