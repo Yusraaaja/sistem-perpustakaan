@@ -8,13 +8,41 @@ import os
 from typing import Optional
 
 
-def get_connection(db_path: str, timeout: float = 10.0) -> sqlite3.Connection:
+def get_connection(
+    db_path: Optional[str] = None,
+    timeout: Optional[float] = None
+) -> sqlite3.Connection:
     """
-    Membuka koneksi ke SQLite dengan penegakan integritas Foreign Keys (R3).
-    Selalu mengaktifkan PRAGMA foreign_keys = ON dan row_factory = sqlite3.Row.
+    Membuka koneksi ke SQLite dengan penegakan integritas Foreign Keys (Task 1B-03 / R3).
+    - Menjadi jalur koneksi terpusat untuk aplikasi runtime, repository, service, dan migrator.
+    - Resolusi db_path default: os.environ.get('DATABASE_NAME') or 'perpustakaan.db'.
+    - Menjamin PRAGMA foreign_keys = ON di setiap koneksi.
+    - Menetapkan PRAGMA busy_timeout sesuai konfigurasi timeout untuk mencegah database locked.
+    - Mendukung konfigurasi SQLITE_TIMEOUT dan SQLITE_JOURNAL_MODE dari environment.
+    - Mengaktifkan row_factory = sqlite3.Row untuk akses data berbasis nama kolom.
     """
+    if not db_path:
+        db_file = os.environ.get('DATABASE_NAME') or 'perpustakaan.db'
+        if db_file == ':memory:' or os.path.isabs(db_file):
+            db_path = db_file
+        else:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            db_path = os.path.join(base_dir, db_file)
+
+    if timeout is None:
+        timeout = float(os.environ.get('SQLITE_TIMEOUT', 30.0))
+
     conn = sqlite3.connect(db_path, timeout=timeout)
+    conn.execute(f"PRAGMA busy_timeout = {int(timeout * 1000)};")
     conn.execute("PRAGMA foreign_keys = ON;")
+
+    _env_journal = os.environ.get('SQLITE_JOURNAL_MODE')
+    if _env_journal:
+        try:
+            conn.execute(f"PRAGMA journal_mode = {_env_journal.strip().upper()};")
+        except sqlite3.Error:
+            pass
+
     conn.row_factory = sqlite3.Row
     return conn
 

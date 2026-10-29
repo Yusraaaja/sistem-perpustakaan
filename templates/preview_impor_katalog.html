@@ -1,0 +1,296 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-2 mb-5">
+    <div class="col-12 col-xl-11">
+        
+        <!-- Header & Navigasi -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge rounded-pill fw-medium" style="background-color: #EEF2FF; color: #4F46E5; font-size: 0.75rem; padding: 5px 12px; border: 1px solid #C7D2FE;">
+                        <i class="bi bi-eye-fill me-1"></i> Fase 3 &bull; Pratinjau Impor Katalog
+                    </span>
+                    <span class="badge rounded-pill bg-light text-secondary border" style="font-size: 0.75rem; padding: 5px 10px;">
+                        File: <code class="text-primary fw-bold">{{ filename }}</code>
+                    </span>
+                </div>
+                <h4 class="page-title mb-1">Hasil Pratinjau &amp; Validasi Impor Katalog</h4>
+                <p class="text-muted small mb-0">Pemeriksaan integritas baris data CSV secara read-only. Sistem tidak memodifikasi database pada tahap ini.</p>
+            </div>
+            
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="{{ url_for('panduan_impor_katalog') }}" class="btn btn-outline-primary btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 rounded-3 shadow-sm">
+                    <i class="bi bi-cloud-arrow-up fs-6"></i> Unggah Ulang / Ganti File
+                </a>
+                <a href="/koleksi" class="btn btn-light border btn-sm px-3 py-2 fw-semibold text-secondary d-inline-flex align-items-center gap-1.5 rounded-3 shadow-xs" style="background-color: #FFFFFF; border-color: #E2E8F0 !important;">
+                    <i class="bi bi-arrow-left"></i> Kembali ke Katalog
+                </a>
+            </div>
+        </div>
+
+        <!-- Banner Penegasan Zero-Write -->
+        <div class="card app-card border-0 shadow-sm rounded-4 mb-4 p-3" style="background-color: #F8FAFC; border-left: 4px solid #10B981 !important;">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #ECFDF5; color: #059669; width: 38px; height: 38px; flex-shrink: 0;">
+                    <i class="bi bi-shield-check fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Status Keamanan: Zero-Write (Database 100% Utuh)</h6>
+                    <p class="text-muted small mb-0" style="line-height: 1.55;">
+                        Hasil di bawah ini merupakan simulasi validasi menyeluruh di server. 
+                        <strong>Tidak ada judul atau eksemplar yang ditulis ke database</strong>. 
+                        Seluruh formula spreadsheet dinonaktifkan (diperlakukan sebagai string literal murni). 
+                        Fitur penyimpanan massal atomik akan ditangani pada tahap selanjutnya (Task 3-07).
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ringkasan Metrik Validasi (4 Cards) -->
+        <div class="row g-3 mb-4">
+            <!-- Total Baris -->
+            <div class="col-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm p-3 h-100">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-uppercase text-muted fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total Baris</span>
+                        <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background-color: #EEF2FF; color: #4F46E5;">
+                            <i class="bi bi-list-ol fs-6"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold text-dark mb-0">{{ preview.total_rows }}</h3>
+                    <small class="text-muted" style="font-size: 0.75rem;">Baris data diproses</small>
+                </div>
+            </div>
+
+            <!-- Baris OK -->
+            <div class="col-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm p-3 h-100" style="border-bottom: 3px solid #10B981 !important;">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-uppercase text-success fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Siap Impor (OK)</span>
+                        <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background-color: #ECFDF5; color: #059669;">
+                            <i class="bi bi-check-circle-fill fs-6"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold text-success mb-0">{{ preview.valid_rows_count }}</h3>
+                    <small class="text-muted" style="font-size: 0.75rem;">Lolos seluruh validasi</small>
+                </div>
+            </div>
+
+            <!-- Baris Peringatan -->
+            <div class="col-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm p-3 h-100" style="border-bottom: 3px solid #F59E0B !important;">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-uppercase text-warning fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Peringatan</span>
+                        <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background-color: #FEF3C7; color: #D97706;">
+                            <i class="bi bi-exclamation-triangle-fill fs-6"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold text-warning mb-0">{{ preview.warning_rows_count }}</h3>
+                    <small class="text-muted" style="font-size: 0.75rem;">Potensi duplikat judul/ISBN</small>
+                </div>
+            </div>
+
+            <!-- Baris Error -->
+            <div class="col-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm p-3 h-100" style="border-bottom: 3px solid #EF4444 !important;">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-uppercase text-danger fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.05em;">Bermasalah (Error)</span>
+                        <div class="rounded-3 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background-color: #FEE2E2; color: #DC2626;">
+                            <i class="bi bi-x-circle-fill fs-6"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold text-danger mb-0">{{ preview.error_rows_count }}</h3>
+                    <small class="text-muted" style="font-size: 0.75rem;">Wajib diperbaiki</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabel Rincian Per Baris -->
+        <div class="card app-card border-0 shadow-sm rounded-4 p-4">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">Rincian Validasi Seluruh Baris Data</h5>
+                    <small class="text-muted">Setiap baris menampilkan nomor baris sumber pada spreadsheet dan rincian evaluasi server.</small>
+                </div>
+
+                <!-- Filter Tombol Cepat -->
+                <div class="btn-group btn-group-sm" role="group" aria-label="Filter Status">
+                    <button type="button" class="btn btn-outline-secondary active" onclick="filterTable('ALL', this)">Semua ({{ preview.total_rows }})</button>
+                    <button type="button" class="btn btn-outline-success" onclick="filterTable('OK', this)">OK ({{ preview.valid_rows_count }})</button>
+                    <button type="button" class="btn btn-outline-warning" onclick="filterTable('PERINGATAN', this)">Peringatan ({{ preview.warning_rows_count }})</button>
+                    <button type="button" class="btn btn-outline-danger" onclick="filterTable('ERROR', this)">Error ({{ preview.error_rows_count }})</button>
+                </div>
+            </div>
+
+            <div class="table-responsive rounded-3 border">
+                <table class="table table-hover table-sm align-middle small mb-0" id="previewTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3" style="width: 8%;">Baris</th>
+                            <th style="width: 22%;">Judul Buku</th>
+                            <th style="width: 16%;">Penulis</th>
+                            <th style="width: 14%;">ISBN</th>
+                            <th style="width: 12%;">Kategori</th>
+                            <th class="text-center" style="width: 8%;">Jumlah</th>
+                            <th class="text-center" style="width: 10%;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview.rows %}
+                            <tr class="preview-row preview-status-{{ row.status }}">
+                                <td class="ps-3 fw-bold text-secondary">
+                                    <span class="badge bg-light text-dark border">Baris {{ row.row_num }}</span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ row.raw_data.judul or '<kosong>' }}</div>
+                                    {% if row.errors %}
+                                        <div class="mt-1">
+                                            {% for err in row.errors %}
+                                                <div class="text-danger small" style="font-size: 0.76rem;">
+                                                    <i class="bi bi-x-circle me-1"></i> {{ err }}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    {% if row.warnings %}
+                                        <div class="mt-1">
+                                            {% for warn in row.warnings %}
+                                                <div class="text-warning-emphasis small" style="font-size: 0.76rem;">
+                                                    <i class="bi bi-exclamation-triangle me-1"></i> {{ warn }}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td class="text-secondary">{{ row.raw_data.penulis or '<kosong>' }}</td>
+                                <td>
+                                    {% if row.raw_data.isbn %}
+                                        <code class="text-dark bg-light px-1 py-0.5 rounded">{{ row.raw_data.isbn }}</code>
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border fst-italic">Kosong</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge rounded-pill bg-light text-secondary border px-2 py-0.5">{{ row.raw_data.kategori or '<kosong>' }}</span>
+                                </td>
+                                <td class="text-center">
+                                    {% if row.clean_data.jumlah %}
+                                        <span class="badge rounded-pill bg-primary-subtle text-primary fw-bold px-2.5 py-1">{{ row.clean_data.jumlah }}</span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-danger-subtle text-danger fw-bold px-2 py-1">{{ row.raw_data.jumlah or '<kosong>' }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if row.status == 'OK' %}
+                                        <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-semibold">
+                                            <i class="bi bi-check-circle me-1"></i> OK
+                                        </span>
+                                    {% elif row.status == 'PERINGATAN' %}
+                                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 fw-semibold">
+                                            <i class="bi bi-exclamation-triangle me-1"></i> Peringatan
+                                        </span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 fw-semibold">
+                                            <i class="bi bi-x-circle me-1"></i> Error
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Instruksi Perbaikan & Langkah Selanjutnya (Task 3-07) -->
+        <div class="card app-card border-0 shadow-sm rounded-4 mt-4 p-4" style="background-color: #F8FAFC;">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #EEF2FF; color: #4F46E5; width: 38px; height: 38px; flex-shrink: 0;">
+                    <i class="bi bi-info-circle-fill fs-5"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold text-dark mb-1">Tindak Lanjut &amp; Konfirmasi Impor</h6>
+                    <p class="text-muted small mb-3" style="line-height: 1.55;">
+                        {% if preview.error_rows_count > 0 and (preview.valid_rows_count > 0 or preview.warning_rows_count > 0) %}
+                            Ditemukan <strong>{{ preview.error_rows_count }} baris bermasalah</strong> yang tidak dapat diimpor. 
+                            Anda dapat tetap melanjutkan impor untuk <strong>{{ preview.valid_rows_count + preview.warning_rows_count }} baris yang memenuhi syarat</strong> (baris error akan otomatis dilewati dan tidak ditulis ke database).
+                        {% elif preview.error_rows_count > 0 and preview.valid_rows_count == 0 and preview.warning_rows_count == 0 %}
+                            Seluruh baris ({{ preview.error_rows_count }} baris) mengalami error validasi. Tidak ada data yang dapat diimpor. Silakan perbaiki file CSV Anda dan unggah ulang.
+                        {% else %}
+                            Seluruh baris memenuhi syarat. Data siap untuk diproses ke tahap konfirmasi komit impor katalog.
+                        {% endif %}
+                    </p>
+
+                    {% if preview.valid_rows_count > 0 or preview.warning_rows_count > 0 %}
+                        <form action="{{ url_for('konfirmasi_impor_katalog') }}" method="POST" class="mb-3">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="csv_content" value="{{ raw_csv_b64 }}">
+                            <input type="hidden" name="filename" value="{{ filename }}">
+
+                            {% if preview.warning_rows_count > 0 %}
+                                <div class="card p-3 mb-3 bg-white border border-warning-subtle rounded-3">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                                        <h6 class="fw-bold text-dark mb-0 small">Opsi Penanganan Peringatan Judul Mirip (DEC-013)</h6>
+                                    </div>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" name="skip_warnings" id="skip_warnings" value="1">
+                                        <label class="form-check-label text-dark small" for="skip_warnings">
+                                            <strong>Lewati baris dengan peringatan</strong> (jangan impor {{ preview.warning_rows_count }} baris yang berpotensi serupa).
+                                        </label>
+                                        <div class="text-muted" style="font-size: 0.76rem;">
+                                            Jika tidak dicentang (default), judul dengan peringatan tetap akan dibuat sebagai rekaman katalog baru terpisah dengan eksemplar mandiri (tidak pernah digabung atau ditimpa sesuai DEC-013).
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-success btn-sm px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2 rounded-3 shadow-sm">
+                                    <i class="bi bi-arrow-right-circle"></i> Lanjutkan ke Konfirmasi Impor
+                                </button>
+                                <a href="{{ url_for('panduan_impor_katalog') }}" class="btn btn-outline-secondary btn-sm px-3 py-2 fw-semibold rounded-3">
+                                    Batal &amp; Unggah Berkas Baru
+                                </a>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="{{ url_for('panduan_impor_katalog') }}" class="btn btn-primary btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 rounded-3 shadow-sm">
+                                <i class="bi bi-cloud-arrow-up"></i> Unggah Ulang File CSV yang Diperbaiki
+                            </a>
+                            <a href="/koleksi" class="btn btn-outline-secondary btn-sm px-3 py-2 fw-semibold rounded-3">
+                                Ke Halaman Koleksi Katalog
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function filterTable(status, btnElement) {
+    // Update active button
+    var buttons = btnElement.parentElement.querySelectorAll('button');
+    buttons.forEach(function(b) { b.classList.remove('active'); });
+    btnElement.classList.add('active');
+
+    // Filter rows
+    var rows = document.querySelectorAll('.preview-row');
+    rows.forEach(function(row) {
+        if (status === 'ALL') {
+            row.style.display = '';
+        } else if (row.classList.contains('preview-status-' + status)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}
+

@@ -113,8 +113,14 @@ def get_copy_by_id(conn: sqlite3.Connection, copy_id: str) -> Optional[Dict[str,
         JOIN catalog_titles t ON c.title_id = t.id
         WHERE c.id = ?;
     """
-    row = conn.execute(sql, (copy_id,)).fetchone()
-    return dict(row) if row else None
+    cur = conn.cursor()
+    row = cur.execute(sql, (copy_id,)).fetchone()
+    if not row:
+        return None
+    if isinstance(row, (sqlite3.Row, dict)):
+        return dict(row)
+    col_names = [col[0] for col in cur.description]
+    return dict(zip(col_names, row))
 
 
 def list_copies_by_title(
@@ -229,4 +235,293 @@ def map_legacy_copy(
         """,
         (old_ref, copy_id, legacy_buku_id),
     )
+
+
+def get_copies_for_labels(
+    conn: sqlite3.Connection,
+    title_id: Optional[str] = None,
+    copy_ids: Optional[Sequence[str]] = None,
+    search: Optional[str] = None,
+    limit: int = 100
+) -> List[Dict[str, Any]]:
+    """
+    Mengambil data eksemplar beserta detail katalog untuk cetak label QR (Task 3-08).
+    Mendukung skema v2 (copies JOIN catalog_titles) dan fallback aman ke skema legacy (buku).
+    MURNI BACA (READ-ONLY) - Tidak mengubah state database sama sekali.
+    """
+    cursor = conn.cursor()
+    tables = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+
+    if "copies" in tables and "catalog_titles" in tables:
+        conditions = []
+        params: List[Any] = []
+
+        if copy_ids:
+            seen_ids: Set[str] = set()
+            clean_ids: List[str] = []
+            for cid in copy_ids:
+                scid = str(cid).strip()
+                if scid and scid not in seen_ids:
+                    seen_ids.add(scid)
+                    clean_ids.append(scid)
+            if clean_ids:
+                placeholders = ",".join(["?"] * len(clean_ids))
+                conditions.append(f"c.id IN ({placeholders})")
+                params.extend(clean_ids)
+            else:
+                return []
+        elif title_id:
+            conditions.append("c.title_id = ? AND c.status = 'aktif'")
+            params.append(str(title_id).strip())
+        else:
+            conditions.append("c.status = 'aktif'")
+
+        if search and str(search).strip():
+            s = f"%{str(search).strip()}%"
+            conditions.append("(c.id LIKE ? OR t.judul LIKE ? OR t.penulis LIKE ?)")
+            params.extend([s, s, s])
+
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+        params.append(max(1, min(int(limit), 500)))
+
+        query = f"""
+            SELECT 
+                c.id AS copy_id,
+                c.title_id,
+                c.status AS copy_status,
+                c.call_number,
+                c.lokasi_rak,
+                c.created_at AS copy_created_at,
+                t.judul,
+                t.penulis,
+                t.isbn,
+                t.kategori
+            FROM copies c
+            JOIN catalog_titles t ON c.title_id = t.id
+            {where_clause}
+            ORDER BY c.created_at DESC, c.id ASC
+            LIMIT ?;
+        """
+        cursor.execute(query, tuple(params))
+        col_names = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+        results: List[Dict[str, Any]] = []
+        for r in rows:
+            if isinstance(r, sqlite3.Row):
+                results.append(dict(r))
+            elif isinstance(r, dict):
+                results.append(r)
+            else:
+                results.append(dict(zip(col_names, r)))
+        return results
+
+    if "buku" in tables:
+        import json
+        query = "SELECT id, judul, penulis, isbn, kategori, lokasi_rak, id_buku_fisik FROM buku"
+        params = []
+        conds = []
+        if title_id:
+            conds.append("id = ?")
+            params.append(title_id)
+        if search and str(search).strip():
+            s = f"%{str(search).strip()}%"
+            conds.append("(judul LIKE ? OR penulis LIKE ? OR id_buku_fisik LIKE ?)")
+            params.extend([s, s, s])
+        if conds:
+            query += " WHERE " + " AND ".join(conds)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(max(1, min(int(limit), 500)))
+
+        cursor.execute(query, tuple(params))
+        col_names = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+        results = []
+        target_copy_ids = set(str(cid).strip() for cid in copy_ids) if copy_ids else None
+
+        for raw_r in rows:
+            r = dict(raw_r) if isinstance(raw_r, (sqlite3.Row, dict)) else dict(zip(col_names, raw_r))
+            b_id = str(r["id"])
+            judul = r["judul"] or ""
+            penulis = r["penulis"] or ""
+            isbn = r["isbn"]
+            kategori = r["kategori"]
+            lokasi = r["lokasi_rak"]
+            raw_ids = r["id_buku_fisik"]
+            copy_list = []
+            if raw_ids:
+                try:
+                    parsed = json.loads(raw_ids)
+                    if isinstance(parsed, list):
+                        copy_list = [str(x).strip() for x in parsed if str(x).strip()]
+                except Exception:
+                    pass
+            if not copy_list:
+                copy_list = [f"C-{b_id}"]
+
+            for cid in copy_list:
+                if target_copy_ids is not None and cid not in target_copy_ids:
+                    continue
+                results.append({
+                    "copy_id": cid,
+                    "title_id": b_id,
+                    "copy_status": "aktif",
+                    "call_number": None,
+                    "lokasi_rak": lokasi,
+                    "copy_created_at": None,
+                    "judul": judul,
+                    "penulis": penulis,
+                    "isbn": isbn,
+                    "kategori": kategori,
+                })
+                if len(results) >= limit:
+                    break
+            if len(results) >= limit:
+                break
+        return results
+
+    return []
+
+
+def get_unlabeled_candidate_copies(
+    conn: sqlite3.Connection,
+    search: Optional[str] = None,
+    lokasi_rak: Optional[str] = None,
+    legacy_only: bool = False,
+    limit: int = 200,
+) -> List[Dict[str, Any]]:
+    """
+    Mengambil data eksemplar buku lama / kandidat di rak yang perlu diverifikasi fisik labelnya (Task 3-09).
+    Sistem tidak mencatat penempelan fisik label di database; fungsi ini menyajikan kandidat eksemplar
+    berdasarkan integritas data historis (legacy_copy_map / legacy_buku_id) dan eksemplar aktif di rak.
+    MURNI BACA (READ-ONLY) - Tidak menulis ke database sama sekali.
+    """
+    cursor = conn.cursor()
+    tables = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+
+    if "copies" in tables and "catalog_titles" in tables:
+        conditions = ["c.status = 'aktif'"]
+        params: List[Any] = []
+
+        if legacy_only:
+            conditions.append("(lcm.copy_id IS NOT NULL OR t.legacy_buku_id IS NOT NULL)")
+
+        if search and str(search).strip():
+            s = f"%{str(search).strip()}%"
+            conditions.append("(c.id LIKE ? OR lcm.old_ref LIKE ? OR t.judul LIKE ? OR t.penulis LIKE ?)")
+            params.extend([s, s, s, s])
+
+        if lokasi_rak and str(lokasi_rak).strip():
+            conditions.append("c.lokasi_rak = ?")
+            params.append(str(lokasi_rak).strip())
+
+        where_clause = "WHERE " + " AND ".join(conditions)
+        params.append(max(1, min(int(limit), 500)))
+
+        query = f"""
+            SELECT 
+                c.id AS copy_id,
+                c.title_id,
+                c.status AS copy_status,
+                c.call_number,
+                c.lokasi_rak,
+                c.tanggal_masuk,
+                c.sumber,
+                c.created_at AS copy_created_at,
+                t.judul,
+                t.penulis,
+                t.isbn,
+                t.kategori,
+                lcm.old_ref AS legacy_ref,
+                t.legacy_buku_id
+            FROM copies c
+            JOIN catalog_titles t ON c.title_id = t.id
+            LEFT JOIN legacy_copy_map lcm ON c.id = lcm.copy_id
+            {where_clause}
+            ORDER BY 
+                CASE WHEN c.lokasi_rak IS NOT NULL AND c.lokasi_rak != '' THEN 0 ELSE 1 END,
+                c.lokasi_rak ASC,
+                t.judul ASC,
+                c.id ASC
+            LIMIT ?;
+        """
+        cursor.execute(query, tuple(params))
+        col_names = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+        results: List[Dict[str, Any]] = []
+        for r in rows:
+            if isinstance(r, sqlite3.Row):
+                results.append(dict(r))
+            elif isinstance(r, dict):
+                results.append(r)
+            else:
+                results.append(dict(zip(col_names, r)))
+        return results
+
+    if "buku" in tables:
+        import json
+        query = "SELECT id, judul, penulis, isbn, kategori, lokasi_rak, tanggal_masuk, id_buku_fisik FROM buku"
+        params = []
+        conds = []
+        if search and str(search).strip():
+            s = f"%{str(search).strip()}%"
+            conds.append("(judul LIKE ? OR penulis LIKE ? OR id_buku_fisik LIKE ?)")
+            params.extend([s, s, s])
+        if lokasi_rak and str(lokasi_rak).strip():
+            conds.append("lokasi_rak = ?")
+            params.append(str(lokasi_rak).strip())
+        if conds:
+            query += " WHERE " + " AND ".join(conds)
+        query += " ORDER BY lokasi_rak ASC, id ASC LIMIT ?"
+        params.append(max(1, min(int(limit), 500)))
+
+        cursor.execute(query, tuple(params))
+        col_names = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+        results = []
+
+        for raw_r in rows:
+            r = dict(raw_r) if isinstance(raw_r, (sqlite3.Row, dict)) else dict(zip(col_names, raw_r))
+            b_id = str(r["id"])
+            judul = r["judul"] or ""
+            penulis = r["penulis"] or ""
+            isbn = r["isbn"]
+            kategori = r["kategori"]
+            lokasi = r["lokasi_rak"]
+            tgl_masuk = r["tanggal_masuk"]
+            raw_ids = r["id_buku_fisik"]
+            copy_list = []
+            if raw_ids:
+                try:
+                    parsed = json.loads(raw_ids)
+                    if isinstance(parsed, list):
+                        copy_list = [str(x).strip() for x in parsed if str(x).strip()]
+                except Exception:
+                    pass
+            # Aturan: Tidak membuat label palsu jika tidak ada ID eksemplar yang valid
+            for cid in copy_list:
+                results.append({
+                    "copy_id": cid,
+                    "title_id": b_id,
+                    "copy_status": "aktif",
+                    "call_number": None,
+                    "lokasi_rak": lokasi,
+                    "tanggal_masuk": tgl_masuk,
+                    "sumber": None,
+                    "copy_created_at": None,
+                    "judul": judul,
+                    "penulis": penulis,
+                    "isbn": isbn,
+                    "kategori": kategori,
+                    "legacy_ref": cid,
+                    "legacy_buku_id": int(b_id) if b_id.isdigit() else None,
+                })
+                if len(results) >= limit:
+                    break
+            if len(results) >= limit:
+                break
+        return results
+
+    return []
+
+
 

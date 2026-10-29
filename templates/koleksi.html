@@ -10,9 +10,13 @@
     
     <div class="d-flex flex-wrap align-items-center gap-2">
         {% if session.get('logged_in') %}
-            <button type="button" class="btn btn-primary btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addBookModal">
+            <a href="/buku/tambah" class="btn btn-primary btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm rounded-3">
                 <i class="bi bi-journal-plus fs-6"></i> Tambah Buku Baru
-            </button>
+            </a>
+
+            <a href="/buku/impor/panduan" class="btn btn-outline-primary btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm rounded-3" title="Panduan &amp; Template Impor CSV">
+                <i class="bi bi-file-earmark-spreadsheet fs-6"></i> Panduan &amp; Template Impor
+            </a>
 
             <button type="button" class="btn btn-success btn-sm px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm rounded-3" data-bs-toggle="modal" data-bs-target="#importExcelModal">
                 <i class="bi bi-file-earmark-excel fs-6"></i> Import Excel

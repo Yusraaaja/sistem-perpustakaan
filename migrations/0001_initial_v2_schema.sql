@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS member_categories (
 
 -- 2. Anggota Perpustakaan (Tanpa kelas dan tanpa telepon)
 CREATE TABLE IF NOT EXISTS members (
-    id TEXT PRIMARY KEY,                       -- Format M-xxxx (Base32 Crockford)
+    id TEXT PRIMARY KEY,                       -- Format M-XXXXXX (Base32 Crockford, 6 karakter)
     nama TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif', 'nonaktif')),
     category_id TEXT NOT NULL REFERENCES member_categories(id),
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS members (
 
 -- 3. Judul Katalog (Dipetakan dari buku, memiliki tracking legacy_buku_id unik)
 CREATE TABLE IF NOT EXISTS catalog_titles (
-    id TEXT PRIMARY KEY,                       -- Format T-xxxx (Base32 Crockford)
+    id TEXT PRIMARY KEY,                       -- Format T-XXXXXX (Base32 Crockford, 6 karakter)
     judul TEXT NOT NULL,
     subjudul TEXT,
     penulis TEXT,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS catalog_titles (
 
 -- 4. Eksemplar Fisik Buku (Tanpa kondisi, barcode_id, atau no_induk per R8 & R9)
 CREATE TABLE IF NOT EXISTS copies (
-    id TEXT PRIMARY KEY,                       -- Format C-xxxx (Base32 Crockford)
+    id TEXT PRIMARY KEY,                       -- Format C-XXXXXX (Base32 Crockford, 6 karakter)
     title_id TEXT NOT NULL REFERENCES catalog_titles(id),
     call_number TEXT,
     status TEXT NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif', 'nonaktif', 'hilang', 'rusak', 'dalam_penanganan')),
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS copies (
 
 -- 5. Transaksi Peminjaman (Header, tanpa kelas/jurusan per R4, tracking legacy_peminjaman_id)
 CREATE TABLE IF NOT EXISTS loans (
-    id TEXT PRIMARY KEY,                       -- Format L-xxxx (Base32 Crockford)
+    id TEXT PRIMARY KEY,                       -- Format L-XXXXXX (Base32 Crockford, 6 karakter)
     member_id TEXT REFERENCES members(id),     -- NULL untuk transaksi lama (R4 & catatan data)
     legacy_nama_peminjam TEXT,                 -- Teks asli peminjam lama
     created_at TEXT NOT NULL,                  -- ISO8601 UTC seragam
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS loans (
 
 -- 6. Detail Item Peminjaman (Tanpa denda atau replacement_status per R4)
 CREATE TABLE IF NOT EXISTS loan_items (
-    id TEXT PRIMARY KEY,                       -- Format LI-xxxxxxxx (Base32 Crockford)
+    id TEXT PRIMARY KEY,                       -- Format LI-XXXXXX (Base32 Crockford, 6 karakter)
     loan_id TEXT NOT NULL REFERENCES loans(id),
     copy_id TEXT NOT NULL REFERENCES copies(id),
     borrowed_at TEXT NOT NULL,                 -- ISO8601 UTC seragam
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS legacy_copy_map (
 
 -- 9. Catatan Audit Log
 CREATE TABLE IF NOT EXISTS audit_log (
-    id TEXT PRIMARY KEY,                       -- Format AUD-xxxxxxxx (Base32 Crockford)
+    id TEXT PRIMARY KEY,                       -- Format AUD-XXXXXX (Base32 Crockford, 6 karakter)
     at TEXT NOT NULL,                          -- ISO8601 UTC seragam
     actor TEXT NOT NULL,
     action TEXT NOT NULL,
@@ -163,4 +163,20 @@ FROM catalog_titles t
 LEFT JOIN copies c ON t.id = c.title_id
 LEFT JOIN loan_items li ON c.id = li.copy_id AND li.returned_at IS NULL
 GROUP BY t.id;
+
+-- 13. Tabel Token Konfirmasi & Idempotensi Penambahan Buku (Task 3-03)
+CREATE TABLE IF NOT EXISTS confirmation_tokens (
+    token TEXT PRIMARY KEY,
+    admin_username TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED')),
+    created_at TEXT NOT NULL,                  -- ISO8601 UTC seragam
+    expires_at REAL NOT NULL,                  -- Epoch seconds untuk perbandingan cepat
+    created_title_id TEXT REFERENCES catalog_titles(id),
+    result_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_confirmation_tokens_expires ON confirmation_tokens(expires_at);
+
 

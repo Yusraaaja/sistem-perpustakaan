@@ -68,3 +68,39 @@ class LoanExtensionLimitReachedError(ServiceError):
 class InvalidOperationError(ServiceError):
     """Terjadi ketika suatu operasi dilarang oleh logika bisnis perpustakaan."""
     pass
+
+
+class ConfirmationTokenError(ValidationError):
+    """Terjadi ketika token konfirmasi sekali pakai tidak valid, kedaluwarsa, atau tidak cocok."""
+    pass
+
+
+class ConcurrencyConflictError(InvalidOperationError):
+    """Terjadi ketika permintaan konfirmasi bersamaan (race condition) terdeteksi."""
+    pass
+
+
+class StorageError(ServiceError):
+    """Terjadi ketika operasi penyimpanan atau penghapusan file gagal (Task 3-11)."""
+    pass
+
+
+class SecretKeyError(ServiceError):
+    """Terjadi ketika kunci rahasia aplikasi tidak tersedia atau tidak valid (Task 4-01)."""
+    pass
+
+
+class InvalidMemberTokenError(ValidationError):
+    """Terjadi ketika token QR anggota tidak valid, rusak, atau tanda tangan tidak cocok (Task 4-01)."""
+    pass
+
+
+class MemberTokenRevokedError(ValidationError):
+    """
+    Terjadi ketika versi token QR anggota sudah tidak sesuai dengan versi di database
+    karena telah dicabut atau diterbitkan ulang (Task 4-01, Task 4-07).
+    """
+    pass
+
+
+

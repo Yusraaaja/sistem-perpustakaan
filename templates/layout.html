@@ -757,6 +757,9 @@
                 <a class="nav-link" href="/"><i class="bi bi-search"></i> Cari Buku</a>
                 <a class="nav-link" href="/koleksi"><i class="bi bi-database"></i> Database</a>
                 <a class="nav-link" href="/peminjaman"><i class="bi bi-person-lines-fill"></i> Peminjaman</a>
+                {% if session.get('logged_in') %}
+                <a class="nav-link" href="/admin/members"><i class="bi bi-people"></i> Anggota</a>
+                {% endif %}
             </div>
             <div class="navbar-nav ms-auto align-items-lg-center gap-2 mt-2 mt-lg-0">
                 {% if session.get('logged_in') %}

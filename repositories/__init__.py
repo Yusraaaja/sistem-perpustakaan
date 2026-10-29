@@ -20,6 +20,11 @@ from .catalog_repo import (
     list_titles,
     update_title,
     get_title_availability,
+    list_all_titles_for_duplicate_check,
+    escape_like_pattern,
+    search_catalog_titles_with_availability,
+    count_search_catalog_titles,
+    get_catalog_metrics_v2,
 )
 from .copy_repo import (
     exists_by_id as copy_exists_by_id,
@@ -32,6 +37,8 @@ from .copy_repo import (
     get_copy_availability,
     get_copy_by_legacy_ref,
     map_legacy_copy,
+    get_copies_for_labels,
+    get_unlabeled_candidate_copies,
 )
 from .member_repo import (
     exists_by_id as member_exists_by_id,
@@ -39,9 +46,12 @@ from .member_repo import (
     create_category,
     get_category_by_id,
     list_categories,
+    seed_default_categories,
     create_member,
     get_member_by_id,
     list_members,
+    count_members,
+    get_member_summary_metrics,
     update_member_status,
     increment_qr_version,
 )
@@ -90,15 +100,20 @@ __all__ = [
     "get_copy_availability",
     "get_copy_by_legacy_ref",
     "map_legacy_copy",
+    "get_copies_for_labels",
+    "get_unlabeled_candidate_copies",
     # Member
     "member_exists_by_id",
     "category_exists",
     "create_category",
     "get_category_by_id",
     "list_categories",
+    "seed_default_categories",
     "create_member",
     "get_member_by_id",
     "list_members",
+    "count_members",
+    "get_member_summary_metrics",
     "update_member_status",
     "increment_qr_version",
     # Loan

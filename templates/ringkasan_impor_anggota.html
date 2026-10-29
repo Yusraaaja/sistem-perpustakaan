@@ -1,0 +1,267 @@
+{% extends 'layout.html' %}
+
+{% block title %}Ringkasan Hasil Impor Anggota - Sistem Perpustakaan Digital{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+
+        <!-- Header Halaman & Breadcrumb -->
+        <div class="mb-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2 small">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_members') }}" class="text-decoration-none">Anggota</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('panduan_impor_anggota') }}" class="text-decoration-none">Impor Anggota</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Ringkasan Hasil</li>
+                </ol>
+            </nav>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-1">Ringkasan Hasil Impor Anggota</h2>
+                    <p class="text-muted small mb-0">
+                        Laporan akhir eksekusi komit transaksi atomik impor anggota massal (Task 4-05).
+                    </p>
+                </div>
+                <div>
+                    {% if is_replay %}
+                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-2 small">
+                            <i class="bi bi-arrow-repeat me-1"></i> Hasil Replay Idempoten
+                        </span>
+                    {% else %}
+                        <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 small">
+                            <i class="bi bi-check-circle-fill me-1"></i> Transaksi Berhasil (Atomik)
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Banner Status -->
+        {% if is_replay %}
+            <div class="alert alert-warning border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #FEF3C7; color: #D97706; width: 40px; height: 40px; flex-shrink: 0;">
+                        <i class="bi bi-info-circle-fill fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-warning-emphasis mb-1">Permintaan Replay Terdeteksi (Idempoten)</h6>
+                        <p class="small text-warning-emphasis mb-0" style="line-height: 1.55;">
+                            Token konfirmasi ini telah sukses diproses sebelumnya. Sistem mengembalikan ringkasan transaksi sebelumnya secara konsisten tanpa menduplikasi data anggota.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-success border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #DCFCE7; color: #16A34A; width: 40px; height: 40px; flex-shrink: 0;">
+                        <i class="bi bi-check2-circle fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-success-emphasis mb-1">Komit Impor Anggota Selesai Secara Atomik</h6>
+                        <p class="small text-success-emphasis mb-0" style="line-height: 1.55;">
+                            Seluruh data valid berhasil ditulis ke database secara atomik. Perubahan telah dicatat pada <code>audit_log</code>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- 4 KARTU METRIK RESMI -->
+        <div class="row g-3 mb-4">
+            <!-- 1. Anggota Baru Dibuat -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-4 border-success">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Anggota Baru Dibuat</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #DCFCE7; color: #16A34A; width: 34px; height: 34px;">
+                            <i class="bi bi-person-plus-fill"></i>
+                        </div>
+                    </div>
+                    <div class="fs-2 fw-bold text-success">{{ summary.created_count }}</div>
+                    <div class="text-muted small" style="font-size: 0.78rem;">Anggota dengan ID Crockford baru</div>
+                </div>
+            </div>
+
+            <!-- 2. Anggota Diperbarui -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-4 border-warning">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Anggota Diperbarui</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #FEF3C7; color: #D97706; width: 34px; height: 34px;">
+                            <i class="bi bi-person-check-fill"></i>
+                        </div>
+                    </div>
+                    <div class="fs-2 fw-bold text-warning">{{ summary.updated_count }}</div>
+                    <div class="text-muted small" style="font-size: 0.78rem;">Data anggota berhasil dimutasi</div>
+                </div>
+            </div>
+
+            <!-- 3. Baris Dilewati -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-4 border-secondary">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Baris Dilewati</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #F1F5F9; color: #64748B; width: 34px; height: 34px;">
+                            <i class="bi bi-skip-forward-fill"></i>
+                        </div>
+                    </div>
+                    <div class="fs-2 fw-bold text-secondary">{{ summary.skipped_count }}</div>
+                    <div class="text-muted small" style="font-size: 0.78rem;">Tidak dimutasi ke basis data</div>
+                </div>
+            </div>
+
+            <!-- 4. Total Diproses -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-4 border-primary">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Total Diproses</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #EEF2FF; color: #4F46E5; width: 34px; height: 34px;">
+                            <i class="bi bi-check-all"></i>
+                        </div>
+                    </div>
+                    <div class="fs-2 fw-bold text-primary">{{ summary.total_processed }}</div>
+                    <div class="text-muted small" style="font-size: 0.78rem;">Total seluruh baris batch</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daftar Anggota Baru Dibuat -->
+        {% if summary.created_members %}
+            <div class="card app-card border-0 shadow-sm rounded-4 p-4 mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-person-plus text-success me-1"></i> Daftar Anggota Baru Dibuat ({{ summary.created_members|length }})
+                    </h6>
+                </div>
+                <div class="table-responsive rounded-3 border">
+                    <table class="table table-hover table-sm align-middle small mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3" style="width: 15%;">ID Anggota</th>
+                                <th style="width: 40%;">Nama Lengkap</th>
+                                <th style="width: 25%;">Kategori</th>
+                                <th style="width: 20%;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in summary.created_members %}
+                                <tr>
+                                    <td class="ps-3">
+                                        <code class="text-primary fw-bold">{{ m.id }}</code>
+                                    </td>
+                                    <td class="fw-semibold text-dark">{{ m.nama }}</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">{{ m.jenis or m.category_id }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge rounded-pill {% if m.status == 'aktif' %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                                            {{ m.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Daftar Anggota Diperbarui -->
+        {% if summary.updated_members %}
+            <div class="card app-card border-0 shadow-sm rounded-4 p-4 mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-person-check text-warning me-1"></i> Daftar Anggota Diperbarui ({{ summary.updated_members|length }})
+                    </h6>
+                </div>
+                <div class="table-responsive rounded-3 border">
+                    <table class="table table-hover table-sm align-middle small mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3" style="width: 15%;">ID Anggota</th>
+                                <th style="width: 40%;">Nama Terbaru</th>
+                                <th style="width: 25%;">Kategori</th>
+                                <th style="width: 20%;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in summary.updated_members %}
+                                <tr>
+                                    <td class="ps-3">
+                                        <code class="text-primary fw-bold">{{ m.id }}</code>
+                                    </td>
+                                    <td class="fw-semibold text-dark">{{ m.nama }}</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">{{ m.jenis or m.category_id }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge rounded-pill {% if m.status == 'aktif' %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                                            {{ m.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Daftar Baris Dilewati -->
+        {% if summary.skipped_members %}
+            <div class="card app-card border-0 shadow-sm rounded-4 p-4 mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-skip-forward text-secondary me-1"></i> Daftar Baris Dilewati ({{ summary.skipped_members|length }})
+                    </h6>
+                </div>
+                <div class="table-responsive rounded-3 border">
+                    <table class="table table-hover table-sm align-middle small mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3" style="width: 10%;">Baris</th>
+                                <th style="width: 40%;">Nama Anggota</th>
+                                <th style="width: 50%;">Alasan Dilewati</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in summary.skipped_members %}
+                                <tr>
+                                    <td class="ps-3 fw-bold text-secondary">
+                                        <span class="badge bg-light text-dark border">#{{ s.row_num }}</span>
+                                    </td>
+                                    <td class="fw-semibold text-dark">{{ s.nama }}</td>
+                                    <td class="text-muted">{{ s.reason }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Tombol Aksi Navigasi -->
+        <div class="card app-card border-0 shadow-sm rounded-4 p-4" style="background-color: #F8FAFC;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Pengelolaan Anggota Selanjutnya</h6>
+                    <p class="text-muted small mb-0">
+                        Anggota yang baru dibuat atau diperbarui sudah aktif di sistem dan dapat dicetak kartu QR-nya.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <a href="{{ url_for('panduan_impor_anggota') }}" class="btn btn-outline-secondary btn-sm px-3 py-2 fw-semibold rounded-3">
+                        <i class="bi bi-file-earmark-arrow-up me-1"></i> Impor Berkas Lain
+                    </a>
+                    <a href="{{ url_for('admin_members') }}" class="btn btn-primary btn-sm px-4 py-2 fw-semibold rounded-3 shadow-sm">
+                        <i class="bi bi-people-fill me-1"></i> Ke Daftar Anggota
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+

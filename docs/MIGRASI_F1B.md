@@ -32,7 +32,7 @@ Kategori keanggotaan perpustakaan dengan data benih (*seed*):
 
 ### B. `members`
 Tabel anggota perpustakaan (tanpa kolom kelas dan telepon per R2):
-* `id` (`TEXT PRIMARY KEY`): Format `M-XXXXXXXX` (Base32 Crockford).
+* `id` (`TEXT PRIMARY KEY`): Format `M-XXXXXX` (6 karakter Base32 Crockford).
 * `nama` (`TEXT NOT NULL`): Nama lengkap anggota.
 * `status` (`TEXT NOT NULL DEFAULT 'aktif'`): `CHECK (status IN ('aktif', 'nonaktif'))`.
 * `category_id` (`TEXT NOT NULL REFERENCES member_categories(id)`).
@@ -42,7 +42,7 @@ Tabel anggota perpustakaan (tanpa kolom kelas dan telepon per R2):
 
 ### C. `catalog_titles`
 Katalog judul buku (dipetakan dari tabel `buku`):
-* `id` (`TEXT PRIMARY KEY`): Format `T-XXXXXXXX` (Base32 Crockford).
+* `id` (`TEXT PRIMARY KEY`): Format `T-XXXXXX` (6 karakter Base32 Crockford).
 * `judul` (`TEXT NOT NULL`): Judul utama buku.
 * `subjudul` (`TEXT`): Sub-judul buku jika ada.
 * `penulis` (`TEXT`), `penerbit` (`TEXT`), `tahun` (`TEXT`), `isbn` (`TEXT`), `kategori` (`TEXT`), `ddc` (`TEXT`), `sinopsis` (`TEXT`), `cover_path` (`TEXT`).
@@ -53,7 +53,7 @@ Katalog judul buku (dipetakan dari tabel `buku`):
 
 ### D. `copies`
 Eksemplar fisik buku. Mengeliminasi `barcode_id`, `no_induk`, dan `kondisi` dari tabel utama (R8 & R9):
-* `id` (`TEXT PRIMARY KEY`): Format `C-XXXXXXXX` (Base32 Crockford). Dibuat oleh server, unik, dan tidak pernah digunakan ulang.
+* `id` (`TEXT PRIMARY KEY`): Format `C-XXXXXX` (6 karakter Base32 Crockford). Dibuat oleh server, unik, dan tidak pernah digunakan ulang.
 * `title_id` (`TEXT NOT NULL REFERENCES catalog_titles(id)`).
 * `call_number` (`TEXT`): Nomor panggil rak.
 * `status` (`TEXT NOT NULL DEFAULT 'aktif'`): `CHECK (status IN ('aktif', 'nonaktif', 'hilang', 'rusak', 'dalam_penanganan'))`.
@@ -62,7 +62,7 @@ Eksemplar fisik buku. Mengeliminasi `barcode_id`, `no_induk`, dan `kondisi` dari
 
 ### E. `loans`
 Header transaksi peminjaman (tanpa kelas/jurusan per R4):
-* `id` (`TEXT PRIMARY KEY`): Format `L-XXXXXXXX` (Base32 Crockford).
+* `id` (`TEXT PRIMARY KEY`): Format `L-XXXXXX` (6 karakter Base32 Crockford).
 * `member_id` (`TEXT REFERENCES members(id)`): Bernilai `NULL` untuk pinjaman legacy lama.
 * `legacy_nama_peminjam` (`TEXT`): Menyimpan nama asli peminjam data lama.
 * `created_at` (`TEXT NOT NULL`): ISO8601 UTC.
@@ -71,7 +71,7 @@ Header transaksi peminjaman (tanpa kelas/jurusan per R4):
 
 ### F. `loan_items`
 Rincian item buku yang dipinjam dalam suatu transaksi:
-* `id` (`TEXT PRIMARY KEY`): Format `LI-XXXXXXXX` (Base32 Crockford).
+* `id` (`TEXT PRIMARY KEY`): Format `LI-XXXXXX` (6 karakter Base32 Crockford).
 * `loan_id` (`TEXT NOT NULL REFERENCES loans(id)`).
 * `copy_id` (`TEXT NOT NULL REFERENCES copies(id)`).
 * `borrowed_at` (`TEXT NOT NULL`): Waktu pinjam (ISO8601 UTC).
@@ -107,7 +107,7 @@ Peta jejak balik nomor registrasi legacy ke ID eksemplar v2 (R9):
 
 ### I. `audit_log`
 Catatan jejak audit sistem:
-* `id` (`TEXT PRIMARY KEY`): Format `AUD-XXXXXXXX`.
+* `id` (`TEXT PRIMARY KEY`): Format `AUD-XXXXXX` (6 karakter Base32 Crockford).
 * `at` (`TEXT NOT NULL`), `actor` (`TEXT NOT NULL`), `action` (`TEXT NOT NULL`), `object_type` (`TEXT NOT NULL`), `object_id` (`TEXT NOT NULL`), `reason` (`TEXT`), `detail_json` (`TEXT`).
 
 ### J. Database Triggers Proteksi Penghapusan (R12)
@@ -200,4 +200,66 @@ DDL skema v2 saat ini ditulis dan diuji secara spesifik untuk SQLite 3. Penerjem
 - Menggunakan `CREATE OR REPLACE VIEW` untuk `v_copy_availability` dan `v_title_availability`.
 - Menggunakan PostgreSQL trigger function (`BEFORE DELETE ... RAISE EXCEPTION`) menggantikan SQLite `RAISE(ABORT, ...)`.
 - Indeks parsial `CREATE UNIQUE INDEX ... WHERE returned_at IS NULL` identik dan didukung secara native oleh kedua database.
+
+---
+
+## 8. Hasil Rekonsiliasi Data Aktual (Terverifikasi)
+
+Hasil migrasi aktual yang telah diuji secara otomatis pada salinan database `backups/test_copy_migration.db`:
+
+| Entitas Target | Sumber Legacy | Jumlah Baris | Keterangan & Pemetaan |
+|---|---|:---:|---|
+| `catalog_titles` | `buku` | **15** | Pemetaan 1:1, atribut historis di `metadata_json`, `legacy_buku_id` 1..15. |
+| `copies` | `buku.id_buku_fisik` + `peminjaman_detail` | **28** | 27 eksemplar di rak + 1 eksemplar aktif dipinjam (`00001501`), seluruh status `'aktif'`. |
+| `legacy_copy_map` | `no_registrasi` fisik | **28** | Peta jejak balik dari `old_ref` ke `copy_id` dan `legacy_buku_id`. |
+| `loans` | `peminjaman` | **3** | `legacy_peminjaman_id` (11, 12, 13), `legacy_nama_peminjam` utuh, `member_id = NULL`. |
+| `loan_items` | `peminjaman_detail` | **3** | **1 aktif** (`returned_at IS NULL`, Yusra / `00001501`) dan **2 selesai** (`return_condition = 'baik'`, `returned_via = 'legacy'`). |
+| `legacy_loan_item_extra` | `denda_*`, `status_penggantian` | **3** | Menyimpan rincian denda lama tanpa mencemari skema baru. |
+| `member_categories` | Seeding awal | **5** | Kategori keanggotaan dasar (`MC-MURID`, `MC-GURU-JUR`, `MC-GURU-UMUM`, `MC-STAF`, `MC-TEKNISI`). |
+| `schema_version` | Migrator v2 | **1** | Version: `2`, Name: `'0001_initial_v2_schema'`. |
+| `audit_log` | Migrator v2 | **1** | Action: `'MIGRATE_V2'`, Object: `'database'`, Object ID: `'v2'`. |
+
+*Integritas Relasi:* `PRAGMA foreign_key_check;` menghasilkan **0 pelanggaran** (bersih total).  
+*Idempotensi:* Menjalankan migrator kembali menghasilkan baris yang identik tanpa duplikasi atau perubahan ID primary key.
+
+---
+
+## 9. Matriks Pemisahan Lingkungan Database
+
+Untuk mencegah insiden operasional dan kehilangan data, sistem perpustakaan memisahkan secara ketat tiga kategori database:
+
+| Kategori | Path Berkas | Peran & Karakteristik | Batasan Keselamatan |
+|---|---|---|---|
+| **Database Produksi** | `perpustakaan.db` (root) | Database utama operasional sekolah. Berisi data riil berskema v1 baseline. Checksum SHA-256 wajib dipantau ketat. | **DILARANG KERAS dimutasi, dimigrasikan, atau di-cutover tanpa izin tertulis pemilik.** Guardrail migrator menolak otomatis via `os.path.realpath`. |
+| **Database Salinan / Backup** | `backups/*.db` (contoh: `backups/test_copy_migration.db`) | Salinan database untuk pengujian migrasi offline, evaluasi rekonsiliasi, dan cadangan data historis. | Hanya boleh dimigrasikan dalam lingkungan terkontrol dengan flag `--apply`. |
+| **Database Pengujian (Ephemeral)** | `tests/scratch_test_dbs/*.db` atau tempfile | Database sementara yang dibuat otomatis saat automated tests berjalan dan dihapus pada `tearDown()`. | Terisolasi 100% di dalam proses test runner; tidak mempengaruhi lingkungan lain. |
+
+---
+
+## 10. Rangkaian Pengujian Otomatis (114/114 Lulus)
+
+Seluruh kontrak Fase 1B telah dibuktikan melalui pengujian otomatis menyeluruh:
+
+| Modul Pengujian | Jumlah Tes | Cakupan Verifikasi |
+|---|:---:|---|
+| `test_schema_v2_and_migration.py` | 14 | DDL v2, penolakan v1, penolakan path produksi, zero-write dry-run (SHA-256), apply data 15/28/3, atomic rollback, idempotensi, foreign keys, anti-delete triggers, duplikasi registrasi lintas buku, view contracts. |
+| `test_id_generator.py` | 7 | Format Crockford Base32 `<PREFIX>-<6 KARAKTER>`, 10.000 ID unik, eliminasi karakter ambigu, validasi prefix, collision retry & exhaustion. |
+| `test_repositories.py` | 14 | Repository layer v2 (catalog, copy, loan, member, audit), partial index ketersediaan, trigger anti-delete, deactivation bukan delete. |
+| `test_services.py` | 14 | Service layer (loan_service, catalog_service, member_service), batas 168 jam, 1x perpanjang, pengembalian parsial, penggantian kamus/Al-Qur'an (DEC-024), atomic rollback. |
+| `test_routes_v2.py` | 11 | Integrasi route sirkulasi Flask v2 di staging, penolakan anggota nonaktif, penolakan eksemplar sedang dipinjam, soft-delete via `/delete/<id>`. |
+| `test_multi_book_p1.py` | 15 | Baseline multi-buku P1 (pinjam 10 buku, kembali bertahap, denda per item, perlindungan hapus riwayat peminjaman). |
+| `test_production_safety.py` | 10 | Keamanan produksi, session cookie, secret key, login rate limiting, proteksi reset katalog. |
+| `test_time_and_due_date.py` | 11 | Mesin waktu UTC-WIB, batas eksak 168 jam, pergantian tengah malam, perlakuan string tanggal lama. |
+| `test_ai_assistant.py` | 18 | Asisten AI Gemini, proteksi CSRF, validasi ID buku katalog, error handling. |
+| **TOTAL** | **114** | **114 lulus (OK), 0 gagal, 0 error.** |
+
+---
+
+## 11. Batasan Keselamatan dan Larangan Cutover Produksi
+
+> [!CAUTION]
+> **PERINGATAN KESELAMATAN SISTEM:**
+> 1. Keberhasilan pengujian migrasi pada database salinan `backups/test_copy_migration.db` **TIDAK MEMBERIKAN IZIN** untuk menjalankan migrasi pada database produksi `perpustakaan.db`.
+> 2. Database produksi `perpustakaan.db` tetap berstatus **baseline suci (*sacred baseline*)** dengan checksum SHA-256: `1362120FA9D66D8AF0CB810DD57B138A6262C62F05381B6C593CC09887C7F87B`.
+> 3. Segala bentuk migrasi produksi, cutover skema, maupun modifikasi berkas produksi ditangguhkan hingga seluruh fase aplikasi (Fase 2 s.d. Fase 10) selesai diuji dan mendapat persetujuan tertulis dari pemilik sistem.
 

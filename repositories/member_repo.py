@@ -1,15 +1,32 @@
 # -*- coding: utf-8 -*-
 """
 Repositori Anggota Perpustakaan (members & member_categories).
-Memenuhi Sub-Fase 2A, LIB-MEMBER-001, DEC-020, DEC-023 (tanpa kolom kelas & telepon), R2.
+Memenuhi Sub-Fase 2A, LIB-MEMBER-001, DEC-020, DEC-023 (tanpa kolom kelas & telepon), R2, dan Task 4-02.
 """
 import sqlite3
 from typing import Optional, List, Dict, Any, Set
 
 import id_generator
 import timeutil
+from policy import OFFICIAL_MEMBER_CATEGORIES
+from .catalog_repo import escape_like_pattern
 
 VALID_MEMBER_STATUSES = {"aktif", "nonaktif"}
+
+
+def _row_to_dict(row: Any, cur: Optional[sqlite3.Cursor] = None) -> Optional[Dict[str, Any]]:
+    """Helper konversi baris database menjadi dict, tahan variasi row_factory."""
+    if row is None:
+        return None
+    if isinstance(row, sqlite3.Row) or isinstance(row, dict):
+        return dict(row)
+    if cur and cur.description:
+        col_names = [c[0] for c in cur.description]
+        return dict(zip(col_names, row))
+    try:
+        return dict(row)
+    except Exception:
+        return {}
 
 
 def exists_by_id(conn: sqlite3.Connection, member_id: str) -> bool:
@@ -54,18 +71,47 @@ def create_category(
 
 def get_category_by_id(conn: sqlite3.Connection, category_id: str) -> Optional[Dict[str, Any]]:
     """Mengambil satu kategori anggota berdasarkan ID."""
-    row = conn.execute(
+    cur = conn.execute(
         "SELECT * FROM member_categories WHERE id = ?;", (category_id,)
-    ).fetchone()
-    return dict(row) if row else None
+    )
+    row = cur.fetchone()
+    return _row_to_dict(row, cur)
 
 
 def list_categories(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
     """Mendaftar semua kategori anggota perpustakaan."""
-    rows = conn.execute(
+    cur = conn.execute(
         "SELECT * FROM member_categories ORDER BY id ASC;"
-    ).fetchall()
-    return [dict(r) for r in rows]
+    )
+    rows = cur.fetchall()
+    return [_row_to_dict(r, cur) for r in rows]
+
+
+def seed_default_categories(conn: sqlite3.Connection) -> int:
+    """
+    Melakukan seeding 5 kategori anggota resmi (Task 4-02 & MIGRASI_F1B):
+    1. MC-MURID: murid (Siswa / Murid berdasarkan jurusan)
+    2. MC-GURU-JUR: guru_jurusan (Guru kejuruan berdasarkan program keahlian)
+    3. MC-GURU-UMUM: guru_umum (Guru mata pelajaran umum)
+    4. MC-STAF: staf (Tenaga kependidikan / staf tata usaha)
+    5. MC-TEKNISI: teknisi (Laboran / teknisi bengkel/lab)
+    
+    Bersifat idempoten (menjalankannya kembali tidak menimbulkan duplikasi atau error).
+    Jika kategori sudah ada, dibiarkan utuh (DO NOTHING) agar tidak menimpa penyesuaian lokal.
+    Mengembalikan total kategori di tabel.
+    """
+    for cat_id, jenis, keterangan in OFFICIAL_MEMBER_CATEGORIES:
+        conn.execute(
+            """
+            INSERT INTO member_categories (id, jenis, keterangan)
+            VALUES (?, ?, ?)
+            ON CONFLICT(id) DO NOTHING;
+            """,
+            (cat_id, jenis, keterangan),
+        )
+    row = conn.execute("SELECT COUNT(*) FROM member_categories;").fetchone()
+    return int(row[0]) if row else 0
+
 
 
 def create_member(
@@ -136,8 +182,9 @@ def get_member_by_id(conn: sqlite3.Connection, member_id: str) -> Optional[Dict[
         JOIN member_categories mc ON m.category_id = mc.id
         WHERE m.id = ?;
     """
-    row = conn.execute(sql, (member_id,)).fetchone()
-    return dict(row) if row else None
+    cur = conn.execute(sql, (member_id,))
+    row = cur.fetchone()
+    return _row_to_dict(row, cur)
 
 
 def list_members(
@@ -149,7 +196,8 @@ def list_members(
     offset: int = 0
 ) -> List[Dict[str, Any]]:
     """
-    Mendaftar anggota perpustakaan dengan filter status, kategori, atau pencarian nama.
+    Mendaftar anggota perpustakaan dengan filter status, kategori, atau pencarian nama/ID.
+    Mendukung paginasi via limit dan offset serta escaping wildcard LIKE (% dan _) secara aman.
     """
     conditions = []
     params: List[Any] = []
@@ -165,8 +213,8 @@ def list_members(
         params.append(category_id)
 
     if search and search.strip():
-        term = f"%{search.strip()}%"
-        conditions.append("(m.nama LIKE ? OR m.id LIKE ?)")
+        term = f"%{escape_like_pattern(search.strip())}%"
+        conditions.append("(m.nama LIKE ? ESCAPE '\\' OR m.id LIKE ? ESCAPE '\\')")
         params.extend([term, term])
 
     where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
@@ -178,12 +226,86 @@ def list_members(
         FROM members m
         JOIN member_categories mc ON m.category_id = mc.id
         {where_sql}
-        ORDER BY m.created_at DESC
+        ORDER BY m.created_at DESC, m.id DESC
         LIMIT ? OFFSET ?;
     """
     params.extend([limit, offset])
-    rows = conn.execute(sql, tuple(params)).fetchall()
-    return [dict(r) for r in rows]
+    cur = conn.execute(sql, tuple(params))
+    rows = cur.fetchall()
+    return [_row_to_dict(r, cur) for r in rows]
+
+
+def count_members(
+    conn: sqlite3.Connection,
+    status: Optional[str] = None,
+    category_id: Optional[str] = None,
+    search: Optional[str] = None
+) -> int:
+    """
+    Menghitung total baris anggota berdasarkan filter status, kategori, atau pencarian (Task 4-02).
+    """
+    conditions = []
+    params: List[Any] = []
+
+    if status:
+        if status not in VALID_MEMBER_STATUSES:
+            raise ValueError(f"Filter status tidak valid: {status}")
+        conditions.append("m.status = ?")
+        params.append(status)
+
+    if category_id:
+        conditions.append("m.category_id = ?")
+        params.append(category_id)
+
+    if search and search.strip():
+        term = f"%{escape_like_pattern(search.strip())}%"
+        conditions.append("(m.nama LIKE ? ESCAPE '\\' OR m.id LIKE ? ESCAPE '\\')")
+        params.extend([term, term])
+
+    where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    sql = f"""
+        SELECT COUNT(*)
+        FROM members m
+        JOIN member_categories mc ON m.category_id = mc.id
+        {where_sql};
+    """
+    row = conn.execute(sql, tuple(params)).fetchone()
+    return int(row[0]) if row else 0
+
+
+def get_member_summary_metrics(conn: sqlite3.Connection) -> Dict[str, Any]:
+    """
+    Mengambil metrik ringkasan data anggota untuk antarmuka admin (Task 4-02):
+    - total_anggota: total seluruh anggota terdaftar
+    - total_aktif: jumlah anggota berstatus aktif
+    - total_nonaktif: jumlah anggota berstatus nonaktif
+    - total_kategori: jumlah kategori terdefinisi
+    - kategori_breakdown: distribusi jumlah anggota per kategori
+    """
+    total_anggota = conn.execute("SELECT COUNT(*) FROM members;").fetchone()[0]
+    total_aktif = conn.execute("SELECT COUNT(*) FROM members WHERE status = 'aktif';").fetchone()[0]
+    total_nonaktif = conn.execute("SELECT COUNT(*) FROM members WHERE status = 'nonaktif';").fetchone()[0]
+    total_kategori = conn.execute("SELECT COUNT(*) FROM member_categories;").fetchone()[0]
+
+    cur_cat = conn.execute(
+        """
+        SELECT mc.id, mc.jenis, mc.keterangan, COUNT(m.id) AS member_count
+        FROM member_categories mc
+        LEFT JOIN members m ON mc.id = m.category_id
+        GROUP BY mc.id
+        ORDER BY mc.id ASC;
+        """
+    )
+    cat_rows = cur_cat.fetchall()
+
+    return {
+        "total_anggota": int(total_anggota),
+        "total_aktif": int(total_aktif),
+        "total_nonaktif": int(total_nonaktif),
+        "total_kategori": int(total_kategori),
+        "kategori_breakdown": [_row_to_dict(r, cur_cat) for r in cat_rows],
+    }
+
 
 
 def update_member_status(conn: sqlite3.Connection, member_id: str, status: str) -> bool:
@@ -206,15 +328,31 @@ def update_member_status(conn: sqlite3.Connection, member_id: str, status: str) 
 
 
 def update_member(conn: sqlite3.Connection, member_id: str, data: Dict[str, Any]) -> bool:
-    """Memperbarui atribut nama atau kategori anggota."""
-    allowed = {"nama", "category_id"}
+    """Memperbarui atribut nama, kategori, atau status anggota."""
+    allowed = {"nama", "category_id", "status"}
     set_clauses = []
     params: List[Any] = []
 
     for key in allowed:
         if key in data and data[key] is not None:
-            set_clauses.append(f"{key} = ?")
-            params.append(str(data[key]).strip())
+            if key == "status":
+                st = str(data[key]).strip().lower()
+                if st not in VALID_MEMBER_STATUSES:
+                    raise ValueError(f"Status anggota tidak valid: {st}. Pilihan: {VALID_MEMBER_STATUSES}")
+                set_clauses.append("status = ?")
+                params.append(st)
+            elif key == "nama":
+                nm = str(data[key]).strip()
+                if not nm:
+                    raise ValueError("Field 'nama' tidak boleh kosong.")
+                set_clauses.append("nama = ?")
+                params.append(nm)
+            elif key == "category_id":
+                cat = str(data[key]).strip()
+                if not cat:
+                    raise ValueError("Field 'category_id' tidak boleh kosong.")
+                set_clauses.append("category_id = ?")
+                params.append(cat)
 
     if not set_clauses:
         return False
@@ -234,7 +372,7 @@ def increment_qr_version(conn: sqlite3.Connection, member_id: str) -> int:
     Menaikkan versi QR anggota untuk membatalkan QR lama jika kartu hilang atau dicetak ulang.
     """
     now_iso = timeutil.format_iso_utc(timeutil.now_utc())
-    conn.execute(
+    cur = conn.execute(
         """
         UPDATE members
         SET qr_version = qr_version + 1, updated_at = ?
@@ -242,8 +380,10 @@ def increment_qr_version(conn: sqlite3.Connection, member_id: str) -> int:
         """,
         (now_iso, member_id),
     )
+    if cur.rowcount == 0:
+        raise ValueError(f"Anggota dengan ID '{member_id}' tidak ditemukan.")
     row = conn.execute("SELECT qr_version FROM members WHERE id = ?;", (member_id,)).fetchone()
     if not row:
-        raise ValueError(f"Anggota dengan ID {member_id} tidak ditemukan.")
-    return int(row["qr_version"])
+        raise ValueError(f"Anggota dengan ID '{member_id}' tidak ditemukan.")
+    return int(row[0] if isinstance(row, (tuple, list)) else row["qr_version"])
 
