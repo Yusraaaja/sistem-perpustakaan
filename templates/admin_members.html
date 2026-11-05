@@ -17,11 +17,17 @@
         </div>
         
         <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="{{ url_for('admin_member_cards_print') }}" class="btn btn-outline-dark px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs" title="Cetak Kartu Anggota Hemat Tinta Massal (Task 4-08)">
+                <i class="bi bi-printer"></i> Cetak Kartu
+            </a>
             <a href="{{ url_for('unduh_template_impor_anggota') }}" class="btn btn-outline-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
                 <i class="bi bi-file-earmark-arrow-down"></i> Unduh Template
             </a>
             <a href="{{ url_for('panduan_impor_anggota') }}" class="btn btn-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
                 <i class="bi bi-file-earmark-spreadsheet"></i> Panduan Impor
+            </a>
+            <a href="{{ url_for('admin_members_export', status=status or '', category_id=category_id or '', q=query or '') }}" class="btn btn-outline-success px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs" title="Ekspor Data Anggota dengan ID Anggota (Task 4-09)">
+                <i class="bi bi-download"></i> Ekspor Anggota
             </a>
             <a href="/peminjaman" class="btn btn-outline-secondary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
                 <i class="bi bi-person-lines-fill"></i> Sirkulasi Peminjaman
@@ -172,100 +178,128 @@
         </div>
 
         {% if members and members | length > 0 %}
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light text-secondary small text-uppercase">
-                    <tr>
-                        <th style="width: 60px;" class="text-center">No</th>
-                        <th style="width: 140px;">ID Anggota</th>
-                        <th>Nama Anggota</th>
-                        <th style="width: 220px;">Kategori</th>
-                        <th style="width: 120px;" class="text-center">Status Akun</th>
-                        <th style="width: 100px;" class="text-center">Versi QR</th>
-                        <th style="width: 160px;">Terdaftar</th>
-                        <th style="width: 140px;" class="text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for m in members %}
-                    <tr>
-                        <td class="text-center text-muted small">
-                            {{ (page - 1) * per_page + loop.index }}
-                        </td>
-                        <td>
-                            <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
-                               class="badge bg-light text-dark border font-monospace px-2 py-1 text-decoration-none" 
-                               style="font-size: 0.85rem;"
-                               title="Lihat status & riwayat audit">
-                                {{ m.id }}
-                            </a>
-                        </td>
-                        <td>
-                            <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
-                               class="fw-semibold text-dark text-decoration-none"
-                               title="Kelola status anggota">
-                                {{ m.nama }}
-                            </a>
-                        </td>
-                        <td>
-                            <div>
-                                <span class="badge rounded-pill fw-medium" style="background-color: #F1F5F9; color: #334155; font-size: 0.75rem;">
-                                    {{ m.category_jenis | replace('_', ' ') | title }}
+        <form method="POST" action="{{ url_for('admin_member_cards_print') }}" id="formPrintSelectedMembers">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            
+            <!-- Action Bar Saat Ada Anggota Dipilih -->
+            <div id="selectedActionBar" class="d-none align-items-center justify-content-between p-2 mb-2 bg-primary-subtle border border-primary-subtle rounded-3">
+                <div class="small fw-semibold text-primary d-flex align-items-center gap-2">
+                    <i class="bi bi-check2-square"></i>
+                    <span><strong id="selectedCount">0</strong> anggota dipilih</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1 shadow-xs" id="btnPrintSelected">
+                        <i class="bi bi-printer-fill"></i> Cetak Kartu Terpilih
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-secondary small text-uppercase">
+                        <tr>
+                            <th style="width: 40px;" class="text-center">
+                                <input type="checkbox" id="selectAllMembers" class="form-check-input" title="Pilih Semua Anggota di Halaman Ini">
+                            </th>
+                            <th style="width: 50px;" class="text-center">No</th>
+                            <th style="width: 130px;">ID Anggota</th>
+                            <th>Nama Anggota</th>
+                            <th style="width: 200px;">Kategori</th>
+                            <th style="width: 110px;" class="text-center">Status Akun</th>
+                            <th style="width: 90px;" class="text-center">Versi QR</th>
+                            <th style="width: 140px;">Terdaftar</th>
+                            <th style="width: 170px;" class="text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in members %}
+                        <tr>
+                            <td class="text-center">
+                                <input type="checkbox" name="member_ids" value="{{ m.id }}" class="member-select-chk form-check-input">
+                            </td>
+                            <td class="text-center text-muted small">
+                                {{ (page - 1) * per_page + loop.index }}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
+                                   class="badge bg-light text-dark border font-monospace px-2 py-1 text-decoration-none" 
+                                   style="font-size: 0.85rem;"
+                                   title="Lihat status & riwayat audit">
+                                    {{ m.id }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
+                                   class="fw-semibold text-dark text-decoration-none"
+                                   title="Kelola status anggota">
+                                    {{ m.nama }}
+                                </a>
+                            </td>
+                            <td>
+                                <div>
+                                    <span class="badge rounded-pill fw-medium" style="background-color: #F1F5F9; color: #334155; font-size: 0.75rem;">
+                                        {{ m.category_jenis | replace('_', ' ') | title }}
+                                    </span>
+                                </div>
+                                {% if m.category_keterangan %}
+                                <div class="text-muted text-truncate" style="font-size: 0.75rem; max-width: 220px;" title="{{ m.category_keterangan }}">
+                                    {{ m.category_keterangan }}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if m.status == 'aktif' %}
+                                <span class="badge rounded-pill bg-success-subtle text-success fw-semibold px-2 py-1" style="font-size: 0.75rem;">
+                                    <i class="bi bi-check-circle-fill me-0.5"></i> Aktif
                                 </span>
-                            </div>
-                            {% if m.category_keterangan %}
-                            <div class="text-muted text-truncate" style="font-size: 0.75rem; max-width: 220px;" title="{{ m.category_keterangan }}">
-                                {{ m.category_keterangan }}
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            {% if m.status == 'aktif' %}
-                            <span class="badge rounded-pill bg-success-subtle text-success fw-semibold px-2 py-1" style="font-size: 0.75rem;">
-                                <i class="bi bi-check-circle-fill me-0.5"></i> Aktif
-                            </span>
-                            {% else %}
-                            <span class="badge rounded-pill bg-secondary-subtle text-secondary fw-semibold px-2 py-1" style="font-size: 0.75rem;">
-                                <i class="bi bi-dash-circle-fill me-0.5"></i> Nonaktif
-                            </span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            <a href="{{ url_for('admin_member_qr', member_id=m.id) }}" 
-                               class="badge bg-secondary-subtle text-secondary font-monospace text-decoration-none" 
-                               style="font-size: 0.75rem;" 
-                               title="Lihat kartu QR / Terbitkan ulang">
-                                v{{ m.qr_version }}
-                            </a>
-                        </td>
-                        <td class="small text-muted">
-                            {{ m.created_at[:10] if m.created_at else '-' }}
-                        </td>
-                        <td class="text-center text-nowrap">
-                            {% if m.status == 'aktif' %}
-                            <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
-                               class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 py-0 px-2"
-                               title="Nonaktifkan akun anggota ini">
-                                <i class="bi bi-person-x"></i> Nonaktifkan
-                            </a>
-                            {% else %}
-                            <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
-                               class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 py-0 px-2"
-                               title="Aktifkan kembali akun anggota ini">
-                                <i class="bi bi-person-check"></i> Aktifkan
-                            </a>
-                            {% endif %}
-                            <a href="{{ url_for('admin_member_qr', member_id=m.id) }}" 
-                               class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 py-0 px-2 ms-1"
-                               title="Lihat kartu QR & fasilitas penerbitan ulang">
-                                <i class="bi bi-qr-code"></i> QR
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                                {% else %}
+                                <span class="badge rounded-pill bg-secondary-subtle text-secondary fw-semibold px-2 py-1" style="font-size: 0.75rem;">
+                                    <i class="bi bi-dash-circle-fill me-0.5"></i> Nonaktif
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('admin_member_qr', member_id=m.id) }}" 
+                                   class="badge bg-secondary-subtle text-secondary font-monospace text-decoration-none" 
+                                   style="font-size: 0.75rem;" 
+                                   title="Lihat kartu QR / Terbitkan ulang">
+                                    v{{ m.qr_version }}
+                                </a>
+                            </td>
+                            <td class="small text-muted">
+                                {{ m.created_at[:10] if m.created_at else '-' }}
+                            </td>
+                            <td class="text-center text-nowrap">
+                                {% if m.status == 'aktif' %}
+                                <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
+                                   class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 py-0 px-2"
+                                   title="Nonaktifkan akun anggota ini">
+                                    <i class="bi bi-person-x"></i> Nonaktifkan
+                                </a>
+                                {% else %}
+                                <a href="{{ url_for('admin_member_status', member_id=m.id) }}" 
+                                   class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 py-0 px-2"
+                                   title="Aktifkan kembali akun anggota ini">
+                                    <i class="bi bi-person-check"></i> Aktifkan
+                                </a>
+                                {% endif %}
+                                <a href="{{ url_for('admin_member_qr', member_id=m.id) }}" 
+                                   class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 py-0 px-2 ms-1"
+                                   title="Lihat kartu QR & fasilitas penerbitan ulang">
+                                    <i class="bi bi-qr-code"></i> QR
+                                </a>
+                                <a href="{{ url_for('admin_member_card', member_id=m.id) }}" 
+                                   class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 py-0 px-2 ms-1"
+                                   title="Cetak kartu anggota hemat tinta (Task 4-08)">
+                                    <i class="bi bi-printer"></i> Cetak
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
 
         <!-- Paginasi -->
         {% if total_pages > 1 %}
@@ -336,6 +370,45 @@
         </div>
     </div>
     {% endif %}
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAll = document.getElementById('selectAllMembers');
+        const checkboxes = document.querySelectorAll('.member-select-chk');
+        const actionBar = document.getElementById('selectedActionBar');
+        const countSpan = document.getElementById('selectedCount');
+
+        function updateSelectedState() {
+            const selected = Array.from(checkboxes).filter(cb => cb.checked);
+            const count = selected.length;
+            if (countSpan) countSpan.textContent = count;
+            if (actionBar) {
+                if (count > 0) {
+                    actionBar.classList.remove('d-none');
+                    actionBar.classList.add('d-flex');
+                } else {
+                    actionBar.classList.remove('d-flex');
+                    actionBar.classList.add('d-none');
+                }
+            }
+            if (selectAll) {
+                selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+                selectAll.indeterminate = count > 0 && count < checkboxes.length;
+            }
+        }
+
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                updateSelectedState();
+            });
+        }
+
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', updateSelectedState);
+        });
+    });
+    </script>
 </div>
 {% endblock %}
 

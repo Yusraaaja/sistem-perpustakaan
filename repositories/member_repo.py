@@ -179,7 +179,7 @@ def get_member_by_id(conn: sqlite3.Connection, member_id: str) -> Optional[Dict[
             mc.jenis AS category_jenis,
             mc.keterangan AS category_keterangan
         FROM members m
-        JOIN member_categories mc ON m.category_id = mc.id
+        LEFT JOIN member_categories mc ON m.category_id = mc.id
         WHERE m.id = ?;
     """
     cur = conn.execute(sql, (member_id,))
@@ -224,7 +224,7 @@ def list_members(
             mc.jenis AS category_jenis,
             mc.keterangan AS category_keterangan
         FROM members m
-        JOIN member_categories mc ON m.category_id = mc.id
+        LEFT JOIN member_categories mc ON m.category_id = mc.id
         {where_sql}
         ORDER BY m.created_at DESC, m.id DESC
         LIMIT ? OFFSET ?;
@@ -386,4 +386,57 @@ def increment_qr_version(conn: sqlite3.Connection, member_id: str) -> int:
     if not row:
         raise ValueError(f"Anggota dengan ID '{member_id}' tidak ditemukan.")
     return int(row[0] if isinstance(row, (tuple, list)) else row["qr_version"])
+
+
+def get_all_members_for_export(
+    conn: sqlite3.Connection,
+    status: Optional[str] = None,
+    category_id: Optional[str] = None,
+    search: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Mengambil seluruh data anggota untuk keperluan ekspor (Task 4-09, OPEN-011, DEC-023).
+    Menggabungkan tabel members dengan member_categories untuk menyertakan jenis dan keterangan.
+    Mendukung filter status, kategori, dan pencarian opsional.
+    MURNI BACA (READ-ONLY) - Tidak melakukan mutasi basis data.
+    """
+    conditions = []
+    params: List[Any] = []
+
+    if status:
+        clean_status = str(status).strip().lower()
+        if clean_status not in VALID_MEMBER_STATUSES:
+            raise ValueError(f"Filter status tidak valid: {status}")
+        conditions.append("m.status = ?")
+        params.append(clean_status)
+
+    if category_id:
+        clean_cat = str(category_id).strip()
+        conditions.append("m.category_id = ?")
+        params.append(clean_cat)
+
+    if search and str(search).strip():
+        term = f"%{escape_like_pattern(str(search).strip())}%"
+        conditions.append("(m.nama LIKE ? ESCAPE '\\' OR m.id LIKE ? ESCAPE '\\')")
+        params.extend([term, term])
+
+    where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    sql = f"""
+        SELECT 
+            m.id AS id_anggota,
+            m.nama,
+            mc.jenis,
+            mc.keterangan,
+            m.status,
+            m.created_at,
+            m.updated_at
+        FROM members m
+        LEFT JOIN member_categories mc ON m.category_id = mc.id
+        {where_sql}
+        ORDER BY m.id ASC;
+    """
+    cur = conn.execute(sql, tuple(params))
+    rows = cur.fetchall()
+    return [_row_to_dict(r, cur) for r in rows]
+
 

@@ -1,0 +1,452 @@
+{% extends 'layout.html' %}
+
+{% block title %}Cetak Kartu Anggota Perpustakaan - Sistem Perpustakaan Digital{% endblock %}
+
+{% block content %}
+<style>
+/* ==========================================================================
+   CSS Tata Letak Cetak Kartu Anggota Hemat Tinta (Task 4-08, DEC-008, LIB-QR-004)
+   ========================================================================== */
+
+@page {
+    size: A4 portrait;
+    margin: 10mm;
+}
+
+/* Gaya Tampilan Layar (Screen) */
+.card-controls-bar {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+}
+
+.member-cards-sheet-preview {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 30px;
+}
+
+.member-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(320px, 360px));
+    gap: 20px;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .member-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Desain Kartu Hemat Tinta Standar ISO/CR80 (~85mm x 54mm) */
+.member-card-item {
+    background: #ffffff;
+    border: 1px dashed #64748b;
+    border-radius: 4px;
+    padding: 12px 14px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 200px;
+    color: #0f172a;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.member-card-header {
+    border-bottom: 1px solid #0f172a;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.member-card-instansi {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #0f172a;
+    line-height: 1.15;
+}
+
+.member-card-title {
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    color: #0f172a;
+    line-height: 1.2;
+}
+
+.member-card-version-badge {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border: 1px solid #0f172a;
+    border-radius: 3px;
+    background: #ffffff;
+    color: #0f172a;
+    white-space: nowrap;
+}
+
+.member-card-body {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    align-items: center;
+    flex: 1;
+}
+
+.member-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.member-card-id {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: #0f172a;
+    line-height: 1.2;
+    margin-bottom: 3px;
+}
+
+.member-card-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+    word-break: break-word;
+    margin-bottom: 4px;
+}
+
+.member-card-category {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1.2;
+}
+
+.member-card-keterangan {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: #475569;
+    line-height: 1.2;
+    margin-top: 1px;
+}
+
+.member-card-status {
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-top: 5px;
+    display: inline-block;
+}
+
+.member-card-status.status-aktif {
+    color: #0f172a;
+}
+
+.member-card-status.status-nonaktif {
+    color: #b91c1c;
+    border: 1px solid #b91c1c;
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+
+.member-card-qr {
+    width: 90px;
+    height: 90px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+}
+
+.member-card-qr svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.member-card-footer {
+    border-top: 1px dashed #cbd5e1;
+    padding-top: 4px;
+    margin-top: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.62rem;
+    color: #64748b;
+}
+
+.member-card-guide {
+    font-style: italic;
+}
+
+/* ==========================================================================
+   CSS Mode Cetak Nyata (@media print) - Penghematan Tinta Maksimal
+   ========================================================================== */
+@media print {
+    .no-print,
+    .navbar,
+    .sidebar,
+    nav,
+    header,
+    footer,
+    .btn,
+    .alert,
+    form,
+    #sidebar,
+    .sidebar-wrapper,
+    .header-area,
+    .toast,
+    .modal {
+        display: none !important;
+    }
+
+    body, html {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .container, .container-fluid, main, .main-content {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .member-cards-sheet-preview {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .member-cards-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, 85mm) !important;
+        gap: 6mm 10mm !important;
+        justify-content: center !important;
+        width: 100% !important;
+    }
+
+    .member-card-item {
+        width: 85mm !important;
+        height: 52mm !important;
+        max-height: 52mm !important;
+        border: 1px dashed #000000 !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+        padding: 3mm 4mm !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        box-sizing: border-box !important;
+    }
+
+    .member-card-header {
+        border-bottom: 0.3mm solid #000000 !important;
+        padding-bottom: 1mm !important;
+        margin-bottom: 1.5mm !important;
+    }
+
+    .member-card-instansi {
+        font-size: 6pt !important;
+        color: #000000 !important;
+    }
+
+    .member-card-title {
+        font-size: 7.5pt !important;
+        color: #000000 !important;
+    }
+
+    .member-card-version-badge {
+        font-size: 6.5pt !important;
+        border: 0.2mm solid #000000 !important;
+        color: #000000 !important;
+    }
+
+    .member-card-body {
+        gap: 3mm !important;
+    }
+
+    .member-card-id {
+        font-size: 9.5pt !important;
+        color: #000000 !important;
+        margin-bottom: 1mm !important;
+    }
+
+    .member-card-name {
+        font-size: 8.5pt !important;
+        color: #000000 !important;
+        margin-bottom: 1mm !important;
+    }
+
+    .member-card-category {
+        font-size: 7pt !important;
+        color: #000000 !important;
+    }
+
+    .member-card-keterangan {
+        font-size: 6pt !important;
+        color: #000000 !important;
+    }
+
+    .member-card-status {
+        font-size: 6.5pt !important;
+    }
+
+    .member-card-status.status-aktif {
+        color: #000000 !important;
+    }
+
+    .member-card-status.status-nonaktif {
+        color: #000000 !important;
+        border: 0.2mm solid #000000 !important;
+        font-weight: 800 !important;
+    }
+
+    .member-card-qr {
+        width: 26mm !important;
+        height: 26mm !important;
+        flex-shrink: 0 !important;
+    }
+
+    .member-card-footer {
+        border-top: 0.2mm dashed #666666 !important;
+        padding-top: 1mm !important;
+        margin-top: 1mm !important;
+        font-size: 5.5pt !important;
+        color: #333333 !important;
+    }
+}
+</style>
+
+<div class="container-fluid px-3 px-md-4 py-3">
+
+    <!-- Kontrol Layar & Navigasi (Disembunyikan saat cetak) -->
+    <div class="card-controls-bar no-print shadow-xs">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 small">
+                        <li class="breadcrumb-item"><a href="/koleksi" class="text-decoration-none">Koleksi</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('admin_members') }}" class="text-decoration-none">Kelola Anggota</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Cetak Kartu</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2">
+                    <h4 class="h5 fw-bold text-dark mb-0">Cetak Kartu Anggota Hemat Tinta</h4>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 small">
+                        DEC-008 & LIB-QR-004
+                    </span>
+                    <span class="badge rounded-pill bg-light text-dark border px-2.5 py-1 small font-monospace">
+                        {{ total_cards }} Kartu
+                    </span>
+                </div>
+                <p class="text-muted small mb-0 mt-1">
+                    Format tata letak A4 monokrom hemat tinta (background putih murni, tanpa blok warna tebal, garis potong putus-putus rapi, Zero PII DEC-023).
+                </p>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <a href="{{ url_for('admin_members') }}" class="btn btn-outline-secondary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
+                    <i class="bi bi-arrow-left"></i> Kembali ke Daftar
+                </a>
+                <button type="button" onclick="window.print()" class="btn btn-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs" id="btnPrintMemberCards">
+                    <i class="bi bi-printer-fill"></i> Cetak Sekarang (Ctrl+P)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Area Lembar Kartu Siap Cetak -->
+    <div class="member-cards-sheet-preview">
+        {% if cards and cards|length > 0 %}
+        <div class="member-cards-grid">
+            {% for c in cards %}
+            <div class="member-card-item">
+                <div class="member-card-header">
+                    <div>
+                        <div class="member-card-instansi">Perpustakaan Digital Sekolah</div>
+                        <div class="member-card-title">KARTU ANGGOTA</div>
+                    </div>
+                    <div class="member-card-version-badge" title="Versi Kriptografis QR Aktif">
+                        v{{ c.qr_version }}
+                    </div>
+                </div>
+
+                <div class="member-card-body">
+                    <div class="member-card-info">
+                        <div class="member-card-id">{{ c.member_id }}</div>
+                        <div class="member-card-name">{{ c.nama }}</div>
+                        <div class="member-card-category">
+                            {{ c.kategori_label }}
+                        </div>
+                        {% if c.category_keterangan %}
+                        <div class="member-card-keterangan">
+                            {{ c.category_keterangan }}
+                        </div>
+                        {% endif %}
+                        <div>
+                            {% if c.status == 'aktif' %}
+                            <span class="member-card-status status-aktif">[Status: Aktif]</span>
+                            {% else %}
+                            <span class="member-card-status status-nonaktif">[Status: Nonaktif]</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="member-card-qr" title="Scan QR Anggota pada Sirkulasi">
+                        {{ c.qr_svg | safe }}
+                    </div>
+                </div>
+
+                <div class="member-card-footer">
+                    <span class="member-card-guide">Gunting pada garis putus-putus</span>
+                    <span class="font-monospace">HMAC-SHA256 · {{ c.member_id }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 no-print">
+            <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 mb-3" style="background-color: #F1F5F9; color: #64748B; width: 64px; height: 64px;">
+                <i class="bi bi-person-x fs-2"></i>
+            </div>
+            <h5 class="fw-bold text-dark mb-1">Tidak Ada Kartu yang Dapat Dicetak</h5>
+            <p class="text-muted small mb-3">
+                Tidak ada data anggota yang sesuai dengan kriteria filter atau ID yang dipilih.
+            </p>
+            <a href="{{ url_for('admin_members') }}" class="btn btn-outline-primary px-3 py-2 fw-semibold">
+                <i class="bi bi-arrow-left me-1"></i> Kembali ke Kelola Anggota
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+

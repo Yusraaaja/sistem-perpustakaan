@@ -175,5 +175,49 @@ OFFICIAL_MEMBER_STATUSES = ("aktif", "nonaktif")
 MIN_MEMBER_QR_REISSUE_REASON_LENGTH = int(os.environ.get('POLICY_MIN_MEMBER_QR_REISSUE_REASON_LENGTH', 5))
 MAX_MEMBER_QR_REISSUE_REASON_LENGTH = int(os.environ.get('POLICY_MAX_MEMBER_QR_REISSUE_REASON_LENGTH', 500))
 
+# Batasan pencetakan kartu anggota hemat tinta & cetak massal (Task 4-08, DEC-008, LIB-QR-004)
+MAX_MEMBER_CARDS_PER_PRINT = int(os.environ.get('POLICY_MAX_MEMBER_CARDS_PER_PRINT', 100))
+DEFAULT_MEMBER_CARDS_PAGE_SIZE = int(os.environ.get('POLICY_DEFAULT_MEMBER_CARDS_PAGE_SIZE', 50))
+
+# Ekspor Data Anggota Perpustakaan Menyertakan id_anggota (Task 4-09, OPEN-011, DEC-023)
+MEMBER_EXPORT_HEADERS = ("id_anggota", "nama", "jenis", "keterangan", "status")
+MEMBER_EXPORT_FILENAME_PREFIX = "ekspor_anggota"
+
+# ==============================================================================
+# KEBIJAKAN SESI KIOSK (TASK 5-02, DEC-002, DEC-018)
+# ==============================================================================
+
+# Nama cookie sesi kiosk (terpisah dari cookie sesi admin 'session')
+KIOSK_SESSION_COOKIE_NAME = 'kiosk_session'
+
+# Path cookie kiosk (terbatas pada namespace /kiosk)
+KIOSK_COOKIE_PATH = '/kiosk'
+
+# Durasi sesi kiosk: 1 jam (3600 detik) — cukup untuk satu sesi peminjaman mandiri
+KIOSK_SESSION_LIFETIME_SECONDS = int(os.environ.get('POLICY_KIOSK_SESSION_LIFETIME_SECONDS', 3600))
+
+# Kunci sesi yang DILARANG ada dalam sesi kiosk (mencegah eskalasi privilege ke admin)
+KIOSK_FORBIDDEN_SESSION_KEYS = frozenset({'logged_in', 'user_role', 'admin_username'})
+
+def _parse_kiosk_max_cart_size(env_val, default=10, min_val=1, max_val=50):
+    """Parsing defensif batas keranjang kiosk: rentang valid [1, 50], fallback aman ke 10."""
+    if env_val is None:
+        return default
+    try:
+        parsed = int(str(env_val).strip())
+        if min_val <= parsed <= max_val:
+            return parsed
+        return default
+    except (ValueError, TypeError):
+        return default
+
+
+# Batas maksimum eksemplar dalam satu keranjang kiosk (Task 5-04, K.01)
+# Melindungi dari session cookie overflow (~4 KB limit) dan beban server.
+# DEC-004 "tidak ada batas buku" merujuk pada kebijakan sirkulasi, bukan perlindungan infrastruktur.
+KIOSK_MAX_CART_SIZE = _parse_kiosk_max_cart_size(os.environ.get('POLICY_KIOSK_MAX_CART_SIZE'))
+
+
+
 
 

@@ -22,7 +22,10 @@
                         Pratinjau kartu anggota perpustakaan, kode QR SVG kriptografis, dan fasilitas pencabutan & penerbitan ulang QR (Task 4-07, LIB-QR-001).
                     </p>
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <a href="{{ url_for('admin_member_card', member_id=member.id) }}" class="btn btn-outline-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs" title="Cetak Kartu Hemat Tinta Standar A4 (Task 4-08)">
+                        <i class="bi bi-printer"></i> Cetak Kartu Hemat Tinta
+                    </a>
                     <span class="badge rounded-pill bg-light text-dark border px-3 py-2 font-monospace fs-7">
                         <i class="bi bi-person-badge me-1 text-primary"></i> {{ member.id }}
                     </span>

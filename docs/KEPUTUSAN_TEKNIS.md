@@ -92,3 +92,143 @@ Sistem membedakan secara tegas antara **integritas kriptografis token** dan **ke
 | `validate_member_token()` | Wrapper aman exception untuk controller / kiosk / API. |
 | `generate_member_qr_svg()` | (`services/qr_service.py`) Menghasilkan SVG kode QR dari token anggota. |
 
+---
+
+# KEPUTUSAN TEKNIS: PERLAKUAN TRANSAKSI HISTORIS (MEMBER_ID = NULL)
+
+**Dokumen Keputusan Arsitektur & Kebijakan Data**
+* **ID Tugas Terkait:** Task 4-10 (Fase 4: Anggota, Impor, Kartu QR)
+* **Kebutuhan Terkait:** DEC-018, DEC-020, DEC-023, OPEN-011, LEGACY (Bagian 5), Task 1B-01, Task 7-06
+* **Tanggal Pengesahan:** 30 Oktober 2026
+* **Status:** Disahkan / Opsi A (Definitif)
+
+---
+
+## 1. Pernyataan Keputusan Resmi Pemilik Proyek
+
+Pemilik proyek telah menetapkan keputusan resmi dan mengikat:
+
+> **OPSI A: Biarkan seluruh transaksi peminjaman lama dengan `member_id = NULL` tetap tidak terhubung dengan anggota resmi.**
+
+---
+
+## 2. Makna & Prinsip Inti Keputusan
+
+1. **Preservasi Data Historis Murni (Zero Modification / Anti-Mutation):**
+   * Transaksi masa lampau yang tersimpan dengan nilai `member_id = NULL` (atau data peminjam berupa string teks bebas dari skema legacy v1/P1) dibiarkan utuh dalam kondisi aslinya.
+   * Dilarang keras melakukan backfill, update spekulatif, atau mutasi pada kolom `loans.member_id` hanya demi mengisi nilai foreign key pada data lama.
+
+2. **Larangan Pencocokan Otomatis (Strict Anti-Guessing):**
+   * Sistem tidak boleh mencoba menebak, mencocokkan, atau mengasosiasikan transaksi lama dengan anggota terdaftar secara otomatis (misalnya dengan mencocokkan kemiripan teks string `legacy_nama_peminjam` dengan nama anggota baru).
+   * Prinsip ini mencegah kesalahan atribusi data dan tanggung jawab pinjaman buku di lingkungan sekolah.
+
+3. **Larangan Pembuatan Anggota Fiktif (No Artificial Members):**
+   * Dilarang membuat rekaman anggota baru sintetis, akun "dummy", atau anggota bayangan hanya demi memaksakan relasi foreign key `member_id` pada transaksi lama.
+
+4. **Integritas Catatan Audit & Riwayat (Immutable Audit History):**
+   * Tidak boleh ada penghapusan data transaksi, pengubahan tanggal/waktu, atau pembersihan catatan historis. Riwayat masa lalu adalah dokumen fakta institusional perpustakaan sekolah.
+
+5. **Pemisahan Jalur Sirkulasi (Dual Path Separation):**
+   * **Transaksi Baru (Fase 5, 6, 7 dst.):** Wajib menggunakan mekanisme anggota resmi (verifikasi token QR HMAC-SHA256, validasi keaktifan, aturan batasan pinjam).
+   * **Transaksi Historis:** Berfungsi sebagai rekaman arsip audit. Pada Fase 7 (Task 7-06), transaksi lama dengan `member_id = NULL` / `legacy` dikecualikan dari halaman notifikasi keterlambatan publik untuk melindungi privasi siswa dan menghindari kebingungan.
+
+6. **Klausul Masa Depan (Future Manual Correction Clause):**
+   * Keputusan ini tidak menutup kemungkinan koreksi historis manual di masa mendatang apabila di kemudian hari pemilik proyek memberikan persetujuan tertulis eksplisit melalui keputusan terpisah. Tanpa adanya persetujuan terpisah tersebut, status Opsi A berlaku definitif dan permanen.
+
+---
+
+## 3. Implikasi Teknis & Panduan Pengembang
+
+| Komponen / Modul | Perlakuan Teknis & Batasan Arsitektur |
+|---|---|
+| `repositories/loan_repo.py` | Query join riwayat peminjaman wajib menggunakan `LEFT JOIN members m ON l.member_id = m.id`, sehingga transaksi dengan `member_id IS NULL` tetap terbaca dengan nama peminjam dari `legacy_nama_peminjam` / teks lama tanpa error. |
+| `services/loan_service.py` | Transaksi peminjaman baru (`borrow_copies`) mewajibkan `member_id` valid dan aktif. Tidak ada logika backfill otomatis untuk transaksi lama. |
+| `services/overdue_service.py` (Fase 7 / Task 7-06) | Filter notifikasi keterlambatan publik wajib menyaring klausul `l.member_id IS NOT NULL` sehingga catatan lama tidak bocor ke publik. |
+| Database (`perpustakaan.db`) | Kolom `loans.member_id` tetap nullable (`TEXT REFERENCES members(id) ON DELETE RESTRICT`). Integritas byte-identical database produksi dipertahankan 100%. |
+
+---
+
+# KEPUTUSAN TEKNIS: VENDOR HTML5-QRCODE SECARA LOKAL (ZERO CDN POLICY)
+
+**Dokumen Keputusan Arsitektur & Manajemen Dependensi**
+* **ID Tugas Terkait:** Task 5-01 (Fase 5: Kiosk Tablet)
+* **Kebutuhan Terkait:** DEC-002, DEC-018, LIB-KIOSK-001, LIB-OPS-001
+* **Tanggal Pengesahan:** 30 Oktober 2026
+* **Status:** Disahkan / Aktif
+
+---
+
+## 1. Konteks & Latar Belakang
+
+Sistem perpustakaan sekolah dirancang dengan prinsip **self-service-first** (DEC-018), di mana siswa melakukan transaksi peminjaman mandiri menggunakan tablet bersama berkamera di ruang perpustakaan (DEC-002).
+
+Lingkungan jaringan sekolah sering kali menghadapi kendala:
+1. Pembatasan internet / firewall yang memblokir akses ke domain CDN publik pihak ketiga (seperti `unpkg.com`, `cdn.jsdelivr.net`, atau `cdnjs.cloudflare.com`).
+2. Ketidakstabilan sambungan internet luar (WAN) saat kegiatan sekolah berlangsung, sementara jaringan lokal sekolah (LAN/Wi-Fi) tetap berfungsi.
+3. Kebutuhan operasional mandiri (LIB-OPS-001): kiosk tablet harus tetap dapat memindai QR kartu anggota dan QR buku tanpa memerlukan koneksi ke internet global.
+
+Oleh karena itu, sistem menetapkan **Zero CDN Policy** untuk seluruh komponen pemindaian QR kiosk, dengan menempatkan pustaka pemindaian `html5-qrcode` langsung di dalam aset statis lokal (`static/vendor/`).
+
+---
+
+## 2. Pemilihan & Spesifikasi Pustaka
+
+* **Pustaka:** `html5-qrcode`
+* **Versi Terpilih:** `2.3.8` (Rilis stabil resmi NPM)
+* **Lisensi:** Apache License 2.0 (Bebas digunakan untuk software institusional/open source tanpa royalti).
+* **Ukuran Berkas:** 375.364 byte (`html5-qrcode.min.js`).
+* **Integritas Kriptografis:**
+  * Tarball NPM SHA-1: `0b0cdf7a9926cfd4be530e13a51db47592adfa0d`
+  * Tarball NPM SHA-256: `e215fbfb27f4b027519014f5bf462ceb3faf2a46dbf8d6dbd2df0e4acef0224e`
+  * `html5-qrcode.min.js` SHA-256: `660b12437b1d747e3e68b8be0685c08cb728140110ad213f167b14b66f8b1d8e`
+
+---
+
+## 3. Lokasi Penyimpanan & Aturan Integrasi
+
+1. Berkas utama disimpan di `static/vendor/html5-qrcode/html5-qrcode.min.js`.
+2. Salinan alias disediakan di `static/vendor/html5-qrcode.min.js`.
+3. Template kiosk di masa mendatang (Fase 5 / Task 5-02 s.d. 5-10) wajib memuat skrip menggunakan helper Jinja2 Flask:
+   ```html
+   <script src="{{ url_for('static', filename='vendor/html5-qrcode/html5-qrcode.min.js') }}"></script>
+   ```
+4. Dilarang keras menyisipkan tag `<script>` yang mengarah ke domain CDN luar untuk pemindaian QR di template kiosk.
+
+
+
+
+---
+
+# Keputusan Teknis: Isolasi Sesi Kiosk (Task 5-02, DEC-002, DEC-018)
+
+**ID Keputusan:** DEC-KSI-001
+**Tanggal:** 1 November 2026
+**Status:** Ditetapkan
+
+## Masalah
+
+Flask default menggunakan satu cookie sesi (`session`, `Path=/`) untuk seluruh aplikasi. Karena `Path=/` mencakup semua sub-path, browser mengirim cookie admin ke `/kiosk/` juga — risiko kebocoran hak akses silang jika kiosk membaca cookie yang sama.
+
+## Keputusan
+
+Implementasi `KioskIsolatedSessionInterface` (subclass `SecureCookieSessionInterface`) yang menggantikan `app.session_interface` default Flask.
+
+| Aspek | Sesi Admin | Sesi Kiosk |
+|---|---|---|
+| Nama Cookie | `session` | `kiosk_session` |
+| Path Cookie | `/` | `/kiosk` |
+| Lifetime | 8 jam | 1 jam (KIOSK_SESSION_LIFETIME_SECONDS) |
+| Kunci terlarang | — | `logged_in`, `user_role`, `admin_username` |
+
+**Prinsip:** `open_session` membaca cookie berdasarkan path request. Kiosk HANYA baca `kiosk_session`; admin HANYA baca `session`. Kunci admin dihapus paksa dari sesi kiosk (defense-in-depth). Cookie `Path=/kiosk` mencegah browser mengirim `kiosk_session` ke endpoint admin.
+
+## Mengapa Cookie Path Saja Tidak Cukup
+
+Browser mengirim cookie berdasarkan **request path**, bukan berdasarkan cookie path sendiri. Cookie admin `Path=/` tetap dikirim ke `/kiosk/`. Isolasi wajib dilakukan **server-side** dengan menolak membaca cookie admin saat melayani request kiosk.
+
+## File yang Diubah (Task 5-02)
+
+- `policy.py`: konstanta kiosk (`KIOSK_SESSION_COOKIE_NAME`, `KIOSK_COOKIE_PATH`, `KIOSK_SESSION_LIFETIME_SECONDS`, `KIOSK_FORBIDDEN_SESSION_KEYS`).
+- `app.py`: `_is_kiosk_request()`, `KioskIsolatedSessionInterface`, route `/kiosk/`, guard idle timeout kiosk.
+- `templates/kiosk_index.html`: halaman placeholder kiosk.
+- `tests/test_kiosk_session.py`: 34 tes keamanan isolasi sesi.

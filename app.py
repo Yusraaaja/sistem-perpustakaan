@@ -27,7 +27,12 @@ from policy import (
     DEFAULT_MEMBER_PAGE_SIZE, MAX_MEMBER_PAGE_SIZE,
     MEMBER_IMPORT_FILENAME, MEMBER_IMPORT_HEADERS,
     MAX_MEMBER_IMPORT_FILE_SIZE_BYTES, MAX_MEMBER_IMPORT_ROWS,
-    MEMBER_MATCH_STATUSES, MEMBER_ACTION_CHOICES
+    MEMBER_MATCH_STATUSES, MEMBER_ACTION_CHOICES,
+    MAX_MEMBER_CARDS_PER_PRINT, DEFAULT_MEMBER_CARDS_PAGE_SIZE,
+    MEMBER_EXPORT_HEADERS, MEMBER_EXPORT_FILENAME_PREFIX,
+    KIOSK_SESSION_COOKIE_NAME, KIOSK_COOKIE_PATH,
+    KIOSK_SESSION_LIFETIME_SECONDS, KIOSK_FORBIDDEN_SESSION_KEYS,
+    KIOSK_MAX_CART_SIZE,
 )
 from timeutil import now_utc, to_school_tz, format_school, format_school_date, parse_db_time, check_overdue
 from db import get_connection, detect_schema_version
@@ -72,6 +77,12 @@ from services import (
     get_member_qr,
     reissue_member_qr,
     revoke_and_reissue_member_qr,
+    parse_member_ids,
+    get_member_card_data,
+    get_member_cards_for_printing,
+    export_members_data,
+    generate_members_export_csv,
+    get_members_export_download_payload,
     get_member_import_sample_data,
     generate_member_import_template_csv,
     get_member_import_template_download_payload,
@@ -79,6 +90,7 @@ from services import (
     validate_member_import_decisions,
     create_member_import_confirmation_token,
     commit_member_import_with_token,
+    validate_member_token,
     MemberNotFoundError,
     MemberInactiveError,
     CopyNotFoundError,
@@ -213,6 +225,102 @@ if IS_PRODUCTION:
             "Setel 'ADMIN_PASSWORD' yang kuat atau 'ADMIN_PASSWORD_HASH' di environment variable."
         )
 
+
+# ==============================================================================
+# ISOLASI SESI KIOSK (TASK 5-02, DEC-002, DEC-018)
+# Antarmuka sesi kustom yang memisahkan sesi kiosk dari sesi admin secara ketat.
+# Kiosk: cookie 'kiosk_session' Path=/kiosk; Admin: cookie 'session' Path=/.
+# Kiosk sessions TIDAK PERNAH memuat kunci admin (logged_in, user_role, admin_username).
+# ==============================================================================
+
+from flask.sessions import SecureCookieSessionInterface
+from itsdangerous import BadSignature
+
+
+def _is_kiosk_request(path: str) -> bool:
+    'True jika path request mengarah ke namespace kiosk (/kiosk atau /kiosk/*).'
+    return path == '/kiosk' or path.startswith('/kiosk/')
+
+
+class KioskIsolatedSessionInterface(SecureCookieSessionInterface):
+    'Antarmuka sesi kustom Flask: pisahkan sesi kiosk dari sesi admin secara ketat.'
+
+    def open_session(self, app, request):
+        s = self.get_signing_serializer(app)
+        if s is None:
+            return None
+
+        if _is_kiosk_request(request.path):
+            # Baca cookie kiosk saja, abaikan cookie admin
+            val = request.cookies.get(KIOSK_SESSION_COOKIE_NAME)
+            if not val:
+                return self.session_class({'_is_kiosk': True})
+            try:
+                data = s.loads(val, max_age=KIOSK_SESSION_LIFETIME_SECONDS)
+                # Hapus paksa kunci admin — mencegah eskalasi privilege
+                for key in KIOSK_FORBIDDEN_SESSION_KEYS:
+                    data.pop(key, None)
+                data['_is_kiosk'] = True
+                return self.session_class(data)
+            except BadSignature:
+                return self.session_class({'_is_kiosk': True})
+        else:
+            # Baca cookie admin standar Flask
+            cookie_name = app.config.get('SESSION_COOKIE_NAME', 'session')
+            val = request.cookies.get(cookie_name)
+            if not val:
+                return self.session_class()
+            max_age = int(app.permanent_session_lifetime.total_seconds())
+            try:
+                data = s.loads(val, max_age=max_age)
+                # Hapus marker kiosk jika ada di cookie admin (defensive)
+                data.pop('_is_kiosk', None)
+                return self.session_class(data)
+            except BadSignature:
+                return self.session_class()
+
+    def save_session(self, app, session, response):
+        from flask import request as _current_request
+        s = self.get_signing_serializer(app)
+        if s is None:
+            return
+
+        domain = self.get_cookie_domain(app)
+        secure = self.get_cookie_secure(app)
+        samesite = self.get_cookie_samesite(app)
+        httponly = self.get_cookie_httponly(app)
+
+        if session.accessed:
+            response.vary.add('Cookie')
+
+        if _is_kiosk_request(_current_request.path):
+            name = KIOSK_SESSION_COOKIE_NAME
+            path = KIOSK_COOKIE_PATH
+            expires = None  # Session cookie tanpa expiry tetap untuk kiosk
+        else:
+            name = app.config.get('SESSION_COOKIE_NAME', 'session')
+            path = app.config.get('SESSION_COOKIE_PATH', '/')
+            expires = self.get_expiration_time(app, session)
+
+        if not session:
+            if session.modified:
+                response.delete_cookie(name, domain=domain, path=path,
+                                       secure=secure, samesite=samesite, httponly=httponly)
+                response.vary.add('Cookie')
+            return
+
+        if not self.should_set_cookie(app, session):
+            return
+
+        val = s.dumps(dict(session))
+        response.set_cookie(name, val, expires=expires, httponly=httponly,
+                            domain=domain, path=path, secure=secure, samesite=samesite)
+        response.vary.add('Cookie')
+
+
+# Pasang session interface kustom kiosk SETELAH konfigurasi app selesai
+app.session_interface = KioskIsolatedSessionInterface()
+
 # ==============================================================================
 # BRUTE FORCE & LOGIN RATE LIMITING ENGINE (In-Memory Thread-Safe)
 # ==============================================================================
@@ -281,6 +389,10 @@ def inject_csrf_token():
 def verify_csrf():
     """Verifikasi token CSRF pada seluruh permintaan yang memutasi state (POST, PUT, DELETE, PATCH)."""
     if request.method in ('POST', 'PUT', 'DELETE', 'PATCH'):
+        # Kiosk API endpoint (Task 5-03+) adalah publik dan tidak memiliki sesi admin.
+        # CSRF berbasis sesi tidak relevan untuk kiosk JSON POST.
+        if _is_kiosk_request(request.path) and request.is_json:
+            return  # Kiosk JSON POST dikecualikan dari CSRF sesi admin
         session_token = session.get('_csrf_token')
         request_token = request.form.get('csrf_token') or request.headers.get('X-CSRFToken')
 
@@ -302,7 +414,10 @@ def enforce_session_idle_timeout():
     """
     Penegakan batas ketidakaktifan (idle timeout) pada sesi terautentikasi (Task 3-01).
     Sesi admin yang tidak aktif melampaui ADMIN_IDLE_TIMEOUT_MINUTES akan dibersihkan secara fail-closed.
+    Sesi kiosk (/kiosk/*) dikecualikan; timeout kiosk ditangani terpisah pada Task 5-08.
     """
+    if _is_kiosk_request(request.path):
+        return  # Kiosk session timeout ditangani terpisah (Task 5-08)
     if session.get('logged_in'):
         if request.endpoint in ('logout', 'static'):
             return
@@ -338,6 +453,27 @@ def enforce_session_idle_timeout():
                 return redirect(url_for('login'))
             else:
                 session['last_active'] = now
+
+def is_admin_session() -> bool:
+    """
+    Memeriksa apakah sesi saat ini adalah sesi administrator yang sah dan terautentikasi.
+    Menegakkan otorisasi server-side yang ketat:
+    - Sesi harus terautentikasi (session.get('logged_in') == True).
+    - user_role harus secara eksplisit bernilai string 'admin'.
+    - Sesi dengan user_role yang hilang (None), kosong, tidak dikenal, atau bukan 'admin' DITOLAK.
+    """
+    if not session.get('logged_in'):
+        return False
+    role = session.get('user_role')
+    return isinstance(role, str) and role == 'admin'
+
+
+def reject_unauthorized_admin():
+    """Menolak permintaan yang tidak memiliki hak akses administrator secara konsisten."""
+    if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
+        return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
+    flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
+    return redirect(url_for('login'))
 
 # ==============================================================================
 # CUSTOM ERROR HANDLERS (Tanpa Bocoran Traceback/Internal Path)
@@ -449,6 +585,7 @@ def login():
             clear_login_attempts(client_ip)
             session.permanent = True
             session['logged_in'] = True
+            session['user_role'] = 'admin'
             session['last_active'] = time.time()
             session['admin_username'] = ADMIN_USERNAME
             flash('Selamat datang, Admin!', 'success')
@@ -1732,11 +1869,8 @@ def admin_labels():
     MURNI BACA (READ-ONLY) - Tidak menulis ke database.
     """
     # 1. Autentikasi Admin
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     # 2. Ekstraksi Filter Query Parameter
     title_id = request.args.get('title_id', '').strip() or None
@@ -1809,11 +1943,8 @@ def admin_labels_reprint():
     - MURNI BACA (READ-ONLY) - Tidak menulis ke database.
     """
     # 1. Autentikasi Admin
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     raw_input = ""
     if request.method == 'POST':
@@ -1880,11 +2011,8 @@ def admin_labels_tanpa_label():
     - MURNI BACA (READ-ONLY) - Tidak menulis ke database.
     """
     # 1. Autentikasi Admin
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     search = request.args.get('q', '').strip() or None
     lokasi_rak = request.args.get('lokasi_rak', '').strip() or None
@@ -1942,11 +2070,8 @@ def admin_copy_deactivate(copy_id):
     - Proteksi autentikasi admin & CSRF token.
     """
     # 1. Autentikasi Admin
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     clean_copy_id = str(copy_id).strip()
     conn = get_db_connection()
@@ -2112,11 +2237,8 @@ def admin_members():
     - Kompatibilitas mundur dengan skema legacy P1.
     """
     # 1. Autentikasi Admin
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     conn = get_db_connection()
     try:
@@ -2212,11 +2334,8 @@ def admin_member_status(member_id):
     - Kompatibilitas mundur dengan skema legacy P1.
     """
     # 1. Autentikasi Admin
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     clean_member_id = str(member_id).strip().upper()
     conn = get_db_connection()
@@ -2377,11 +2496,8 @@ def admin_member_qr(member_id):
         return admin_member_reissue_qr(member_id)
 
     # Autentikasi Admin
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     clean_member_id = str(member_id).strip().upper()
     conn = get_db_connection()
@@ -2445,11 +2561,8 @@ def admin_member_reissue_qr(member_id):
     - Tidak menghapus anggota maupun riwayat peminjaman (no hard delete, no cleanup).
     - Status anggota ('aktif' atau 'nonaktif') tidak diubah secara otomatis.
     """
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     clean_member_id = str(member_id).strip().upper()
     conn = get_db_connection()
@@ -2565,6 +2678,239 @@ def admin_member_reissue_qr(member_id):
         conn.close()
 
 
+@app.route('/admin/members/<member_id>/card', methods=['GET'])
+@app.route('/admin/anggota/<member_id>/kartu', methods=['GET'])
+@app.route('/admin/members/<member_id>/kartu', methods=['GET'])
+def admin_member_card(member_id):
+    """
+    Tampilan & Cetak Kartu Fisik Anggota Tunggal Hemat Tinta (Task 4-08, DEC-008, LIB-QR-004).
+    - Memerlukan autentikasi administrator.
+    - Menghasilkan kartu anggota berstandar ~85mm x 54mm ramah cetak A4.
+    - Zero PII (DEC-023): Tanpa nomor telepon, tanpa kelas/rombel.
+    - Zero-Write (Read-Only): Tidak melakukan mutasi basis data pada GET.
+    - Mencakup QR SVG bertanda tangan HMAC-SHA256 sesuai qr_version aktif.
+    - Status nonaktif ditampilkan secara eksplisit tanpa mengaktifkan anggota secara otomatis.
+    - Sembunyikan elemen navigasi/tombol pada @media print.
+    """
+    if not is_admin_session():
+        return reject_unauthorized_admin()
+
+    clean_member_id = str(member_id).strip().upper()
+    conn = get_db_connection()
+    try:
+        schema_ver = detect_schema_version(conn)
+        if schema_ver != 'v2':
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({'ok': False, 'error': 'Not Supported', 'message': 'Fitur anggota hanya didukung pada skema v2.'}), 400
+            flash('Fitur kartu anggota belum tersedia pada skema database legacy.', 'warning')
+            return redirect(url_for('koleksi_lengkap'))
+
+        try:
+            card = get_member_card_data(conn=conn, member_id=clean_member_id)
+        except MemberNotFoundError:
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({'ok': False, 'status': 'error', 'error': 'Not Found', 'message': f"Anggota dengan ID '{clean_member_id}' tidak ditemukan."}), 404
+            flash(f"Anggota dengan ID '{clean_member_id}' tidak ditemukan.", 'danger')
+            abort(404)
+
+        if request.is_json or request.headers.get('Accept') == 'application/json':
+            return jsonify({
+                'ok': True,
+                'status': 'success',
+                'card': card,
+            }), 200
+
+        return render_template(
+            'admin_member_card.html',
+            cards=[card],
+            total_cards=1,
+            single_member=True,
+            member=card,
+        ), 200
+
+    finally:
+        conn.close()
+
+
+@app.route('/admin/members/cards', methods=['GET', 'POST'])
+@app.route('/admin/anggota/kartu/massal', methods=['GET', 'POST'])
+@app.route('/admin/members/kartu/massal', methods=['GET', 'POST'])
+def admin_member_cards_print():
+    """
+    Cetak Massal / Batch Kartu Anggota Hemat Tinta dalam Tata Letak A4 (Task 4-08, DEC-008, LIB-QR-004).
+    - Memerlukan autentikasi administrator.
+    - Menerima kumpulan ID anggota (via parameter GET `member_ids` / `member_id` atau POST form/JSON `member_ids`).
+    - Mendukung filter status, category_id, dan pencarian q jika ID spesifik tidak diberikan.
+    - Server-side deduplikasi dengan mempertahankan urutan masukan asli.
+    - Pembatasan jumlah kartu per cetak (maksimal MAX_MEMBER_CARDS_PER_PRINT = 100).
+    - Grid 2 kolom bergaris potong rapi, page-break-inside avoid, @page A4 portrait margin 10mm.
+    - MURNI BACA (READ-ONLY) - Tidak ada mutasi status maupun mutasi token di database.
+    - Zero PII (DEC-023) dan Zero Delete Buttons (DEC-020).
+    """
+    if not is_admin_session():
+        return reject_unauthorized_admin()
+
+    conn = get_db_connection()
+    try:
+        schema_ver = detect_schema_version(conn)
+        if schema_ver != 'v2':
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({'ok': False, 'error': 'Not Supported', 'message': 'Fitur anggota hanya didukung pada skema v2.'}), 400
+            flash('Fitur cetak kartu anggota belum tersedia pada skema database legacy.', 'warning')
+            return redirect(url_for('koleksi_lengkap'))
+
+        # Ekstraksi parameter
+        member_ids_input = []
+        status = None
+        category_id = None
+        search = None
+        limit = MAX_MEMBER_CARDS_PER_PRINT
+
+        if request.method == 'POST':
+            if request.is_json:
+                json_data = request.get_json(silent=True) or {}
+                raw_ids = json_data.get('member_ids') or json_data.get('member_id')
+                status = json_data.get('status')
+                category_id = json_data.get('category_id')
+                search = json_data.get('q') or json_data.get('search')
+                limit_arg = json_data.get('limit')
+            else:
+                raw_ids = request.form.getlist('member_ids')
+                if not raw_ids:
+                    raw_ids = request.form.get('member_ids') or request.form.get('member_id')
+                status = request.form.get('status')
+                category_id = request.form.get('category_id')
+                search = request.form.get('q') or request.form.get('search')
+                limit_arg = request.form.get('limit')
+
+            if raw_ids:
+                member_ids_input = parse_member_ids(raw_ids)
+            if limit_arg:
+                try:
+                    limit = int(limit_arg)
+                except (ValueError, TypeError):
+                    limit = MAX_MEMBER_CARDS_PER_PRINT
+        else:
+            raw_ids = request.args.getlist('member_ids')
+            if not raw_ids:
+                raw_ids = request.args.get('member_ids') or request.args.get('member_id')
+            if raw_ids:
+                member_ids_input = parse_member_ids(raw_ids)
+            status = request.args.get('status')
+            category_id = request.args.get('category_id')
+            search = request.args.get('q') or request.args.get('search')
+            limit_arg = request.args.get('limit')
+            if limit_arg:
+                try:
+                    limit = int(limit_arg)
+                except (ValueError, TypeError):
+                    limit = MAX_MEMBER_CARDS_PER_PRINT
+
+        limit = max(1, min(limit, MAX_MEMBER_CARDS_PER_PRINT))
+
+        cards = get_member_cards_for_printing(
+            conn=conn,
+            member_ids=member_ids_input if member_ids_input else None,
+            status=status if status else None,
+            category_id=category_id if category_id else None,
+            search=search if search else None,
+            limit=limit,
+        )
+
+        if request.is_json or request.headers.get('Accept') == 'application/json':
+            return jsonify({
+                'ok': True,
+                'status': 'success',
+                'total': len(cards),
+                'cards': cards,
+                'limit': limit,
+            }), 200
+
+        return render_template(
+            'admin_member_card.html',
+            cards=cards,
+            total_cards=len(cards),
+            single_member=False,
+            filter_status=status or '',
+            filter_category_id=category_id or '',
+            filter_search=search or '',
+            limit=limit,
+        ), 200
+
+    finally:
+        conn.close()
+
+
+@app.route('/admin/members/export', methods=['GET'])
+@app.route('/admin/members/ekspor', methods=['GET'])
+@app.route('/admin/anggota/export', methods=['GET'])
+@app.route('/admin/anggota/ekspor', methods=['GET'])
+def admin_members_export():
+    """
+    Ekspor Data Anggota Perpustakaan Menyertakan id_anggota (Task 4-09, OPEN-011, DEC-023).
+    - Memerlukan autentikasi administrator ketat (is_admin_session()).
+    - Menyertakan kolom identitas utama buatan sistem: id_anggota.
+    - Zero PII (DEC-023): Tanpa nomor telepon, tanpa kelas/rombel.
+    - Mencegah CSV Formula Injection (sanitasi karakter pemicu formula '=', '+', '-', '@').
+    - Mendukung filter status, category_id, dan pencarian q jika difilter.
+    - Mendukung format unduhan CSV ber-BOM UTF-8 (default) dan Excel (.xlsx).
+    - Mendukung respons JSON jika diminta via Accept: application/json atau format=json.
+    - MURNI BACA (READ-ONLY) - Tidak melakukan mutasi basis data.
+    """
+    if not is_admin_session():
+        return reject_unauthorized_admin()
+
+    conn = get_db_connection()
+    try:
+        schema_ver = detect_schema_version(conn)
+        if schema_ver != 'v2':
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({'ok': False, 'error': 'Not Supported', 'message': 'Fitur anggota hanya didukung pada skema v2.'}), 400
+            flash('Fitur anggota belum tersedia pada skema database legacy.', 'warning')
+            return redirect(url_for('koleksi_lengkap'))
+
+        format_type = request.args.get('format', 'csv').strip().lower()
+        status = request.args.get('status', '').strip() or None
+        category_id = request.args.get('category_id', '').strip() or None
+        search = request.args.get('q', '').strip() or request.args.get('search', '').strip() or None
+
+        if status and status.lower() not in ('aktif', 'nonaktif'):
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({'ok': False, 'error': 'Validation Error', 'message': f"Filter status '{status}' tidak valid. Harus 'aktif' atau 'nonaktif'."}), 400
+            flash(f"Filter status '{status}' tidak valid. Harus 'aktif' atau 'nonaktif'.", 'danger')
+            return redirect(url_for('admin_members'))
+
+        if format_type == 'json' or request.is_json or request.headers.get('Accept') == 'application/json':
+            members = export_members_data(
+                conn=conn,
+                status=status,
+                category_id=category_id,
+                search=search,
+                sanitize_formulas=False,
+            )
+            return jsonify({
+                'ok': True,
+                'status': 'success',
+                'total': len(members),
+                'members': members,
+            }), 200
+
+        file_bytes, filename, mimetype = get_members_export_download_payload(
+            conn=conn,
+            format_type=format_type,
+            status=status,
+            category_id=category_id,
+            search=search,
+        )
+
+        return send_file(
+            BytesIO(file_bytes),
+            as_attachment=True,
+            download_name=filename,
+            mimetype=mimetype,
+        )
+    finally:
+        conn.close()
 
 
 @app.route('/admin/members/impor/template', methods=['GET'])
@@ -2577,11 +2923,8 @@ def unduh_template_impor_anggota():
     dan data contoh realistis sintetis. Dilindungi autentikasi admin.
     Murni tanpa penulisan/mutasi ke database (Zero-Write).
     """
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json':
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     csv_bytes, filename, mimetype = get_member_import_template_download_payload()
     return send_file(
@@ -2601,11 +2944,8 @@ def panduan_impor_anggota():
     dan kebijakan privasi DEC-023 (kenapa kelas dan telepon diabaikan).
     Dilindungi autentikasi admin.
     """
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json':
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     conn = get_db_connection()
     try:
@@ -2637,11 +2977,8 @@ def preview_impor_anggota():
     ZERO WRITES: Tidak ada penulisan atau perubahan database sama sekali.
     Dilindungi autentikasi admin.
     """
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
-        if request.is_json or request.headers.get('Accept') == 'application/json':
-            return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
-        flash('Silakan login sebagai administrator terlebih dahulu!', 'danger')
-        return redirect(url_for('login'))
+    if not is_admin_session():
+        return reject_unauthorized_admin()
 
     if request.method == 'GET':
         return redirect(url_for('panduan_impor_anggota'))
@@ -2781,7 +3118,7 @@ def konfirmasi_impor_anggota():
     Menerbitkan token konfirmasi persisten sekali pakai dan menampilkan ringkasan aksi sebelum eksekusi atomik.
     Dilindungi autentikasi admin dan verifikasi CSRF.
     """
-    if not session.get('logged_in'):
+    if not is_admin_session():
         if request.is_json or request.headers.get('Accept') == 'application/json':
             return jsonify({'status': 'error', 'ok': False, 'message': 'Sesi login tidak valid atau telah berakhir.'}), 401
         flash('Silakan login terlebih dahulu!', 'danger')
@@ -2926,7 +3263,7 @@ def commit_impor_anggota():
     replay idempotensi, pencegahan konkurensi ganda, dan pencatatan audit log.
     Dilindungi autentikasi admin dan verifikasi CSRF.
     """
-    if not session.get('logged_in'):
+    if not is_admin_session():
         if request.is_json or request.headers.get('Accept') == 'application/json':
             return jsonify({'status': 'error', 'ok': False, 'message': 'Sesi login tidak valid atau telah berakhir.'}), 401
         flash('Silakan login terlebih dahulu!', 'danger')
@@ -3361,7 +3698,7 @@ def upload_cover(id):
     - Dilindungi autentikasi admin dan proteksi CSRF.
     """
     # 1. Autentikasi & Otorisasi Admin
-    if not session.get('logged_in') or session.get('user_role') not in (None, 'admin'):
+    if not is_admin_session():
         if request.is_json or request.headers.get('Accept') == 'application/json' or (request.path and request.path.startswith('/api/')):
             return jsonify({'error': 'Unauthorized', 'message': 'Akses khusus administrator.'}), 401
         flash('Akses ditolak! Anda harus login sebagai admin.', 'danger')
@@ -4534,6 +4871,308 @@ def import_excel():
         flash('Format file wajib .xlsx atau .xls', 'danger')
 
     return redirect(url_for('koleksi_lengkap'))
+
+
+# ==============================================================================
+# FASE 5 - KIOSK TABLET (NAMESPACE /kiosk) - Task 5-02
+# Route /kiosk/* menggunakan sesi terpisah (kiosk_session, Path=/kiosk).
+# Kiosk bersifat publik (tanpa autentikasi admin).
+# Fitur pemindaian QR dan alur peminjaman akan diimplementasikan pada Task 5-03 s.d. 5-10.
+# ==============================================================================
+
+
+@app.route('/kiosk/')
+@app.route('/kiosk')
+def kiosk_index():
+    'Halaman utama kiosk layanan mandiri anggota perpustakaan (Task 5-02).'
+    return render_template('kiosk_index.html')
+
+
+
+# ------------------------------------------------------------------------------
+# FASE 5 — KIOSK: /kiosk/validate_qr (Task 5-03)
+# Endpoint format-check untuk komponen scan QR kiosk.
+#
+# Kontrak:
+#   - Menerima JSON { "code": "<string>" }.
+#   - Hanya memeriksa FORMAT kode (panjang, karakter yang diizinkan).
+#   - TIDAK mengakses database, TIDAK memverifikasi identitas anggota/buku.
+#   - Kode yang lolos dinyatakan sebagai "format_ok", bukan "verified".
+#   - Logika peminjaman dan verifikasi identitas adalah bagian Task 5-04.
+#   - Isolasi sesi kiosk (KioskIsolatedSessionInterface) berlaku otomatis.
+# ------------------------------------------------------------------------------
+_KIOSK_QR_VALID_RE = re.compile(r'^[A-Za-z0-9:\-]{1,200}$')
+_KIOSK_QR_MAX_CODE_LEN = 200
+
+
+@app.route('/kiosk/validate_qr', methods=['POST'])
+def kiosk_validate_qr():
+    """
+    Periksa format kode QR dari kiosk scanner (Task 5-03).
+
+    Hanya memvalidasi format -- belum memverifikasi keanggotaan atau ketersediaan buku.
+    Respons 200 berarti kode lolos pemeriksaan format, bukan bahwa kode valid sebagai
+    anggota atau buku yang sah. Logika tersebut ada di Task 5-04.
+    """
+    # Periksa Content-Type JSON
+    if not request.is_json:
+        return jsonify({
+            'status': 'error',
+            'error': 'Content-Type harus application/json'
+        }), 400
+
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({
+            'status': 'error',
+            'error': 'Body JSON tidak valid atau kosong'
+        }), 400
+
+    # Periksa keberadaan dan tipe field 'code'
+    code = data.get('code')
+    if not isinstance(code, str):
+        return jsonify({
+            'status': 'error',
+            'error': 'Field "code" wajib ada dan bertipe string'
+        }), 400
+
+    code = code.strip()
+
+    # Periksa panjang
+    if len(code) == 0:
+        return jsonify({
+            'status': 'error',
+            'error': 'Kode tidak boleh kosong'
+        }), 400
+
+    if len(code) > _KIOSK_QR_MAX_CODE_LEN:
+        return jsonify({
+            'status': 'error',
+            'error': 'Kode terlalu panjang (maksimum {} karakter)'.format(_KIOSK_QR_MAX_CODE_LEN)
+        }), 400
+
+    # Periksa format karakter
+    if not _KIOSK_QR_VALID_RE.match(code):
+        return jsonify({
+            'status': 'error',
+            'error': 'Format kode tidak dikenali (hanya huruf, angka, tanda "-" dan ":" diizinkan)'
+        }), 400
+
+    # Format lolos -- kembalikan kode untuk konfirmasi UI
+    # CATATAN: ini bukan verifikasi identitas atau keabsahan kode sebagai anggota/buku.
+    display_code = code[:12] + ('...' if len(code) > 12 else '')
+    return jsonify({
+        'status': 'format_ok',
+        'display_code': display_code,
+        'note': 'Kode lolos pemeriksaan format. Belum diverifikasi sebagai anggota atau buku.'
+    }), 200
+
+
+# ------------------------------------------------------------------------------
+# FASE 5 -- KIOSK: /kiosk/scan_member (Task 5-04)
+# Memvalidasi token QR anggota dan menyimpan identitas ke session kiosk.
+#
+# Kontrak keamanan:
+#   - Menggunakan validate_member_token() yang sudah ada (HMAC-SHA256, check_active=True).
+#   - Tidak menyimpan token QR mentah di session (hanya member_id dan nama).
+#   - Tidak mengubah database (READ-ONLY).
+#   - Menolak scan kartu baru jika session anggota sudah aktif (K.02 -> 409).
+# ------------------------------------------------------------------------------
+
+@app.route('/kiosk/scan_member', methods=['POST'])
+def kiosk_scan_member():
+    """Verifikasi token QR anggota dan simpan identitas ke session kiosk (Task 5-04).
+
+    Read-only: tidak ada perubahan database.
+    Tolak: format invalid, HMAC salah, qr_version dicabut, anggota nonaktif, session aktif.
+    """
+    if not request.is_json:
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Content-Type harus application/json'}), 400
+
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Body JSON tidak valid atau kosong'}), 400
+
+    code = data.get('code')
+    if not code or not isinstance(code, str) or not code.strip():
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Field "code" wajib diisi'}), 400
+
+    code = code.strip()
+    if not _KIOSK_QR_VALID_RE.match(code):
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Format kode tidak dikenali'}), 400
+
+    # K.02: Tolak scan kartu baru jika session anggota sudah aktif
+    if session.get('kiosk_member_id'):
+        return jsonify({
+            'status': 'error',
+            'error_code': 'SESSION_ACTIVE',
+            'message': 'Sudah ada anggota aktif dalam sesi ini. Tekan Batal untuk memulai ulang.',
+        }), 409
+
+    conn = get_connection()
+    try:
+        result = validate_member_token(code, conn=conn, check_active=True)
+    finally:
+        conn.close()
+
+    if not result.get('valid'):
+        error_code = result.get('code', 'VERIFICATION_ERROR')
+        message    = result.get('message', 'Verifikasi anggota gagal.')
+        return jsonify({'status': 'error', 'error_code': error_code,
+                        'message': message}), 422
+
+    member_data = result.get('member') or {}
+    member_name = member_data.get('nama', '')
+
+    # Simpan identitas ke session -- tanpa token QR mentah (Ketentuan 14)
+    session['kiosk_member_id']   = result['member_id']
+    session['kiosk_member_name'] = member_name
+    session['kiosk_cart']        = []
+
+    return jsonify({'status': 'member_ok', 'member_name': member_name}), 200
+
+
+# ------------------------------------------------------------------------------
+# FASE 5 -- KIOSK: /kiosk/scan_copy (Task 5-04)
+# Memvalidasi ID eksemplar buku (C-XXXXXXXX) dan menambahkan ke keranjang sementara.
+#
+# Kontrak keamanan:
+#   - Menolak jika session anggota belum ada (403).
+#   - Menolak eksemplar tidak aktif atau tidak tersedia (422).
+#   - Menolak duplikat dalam satu keranjang (409).
+#   - Menolak jika keranjang sudah penuh (422, KIOSK_MAX_CART_SIZE).
+#   - Tidak mengubah database (READ-ONLY).
+#   - PERINGATAN: Task 5-05 WAJIB re-validasi ulang sebelum commit.
+#     Validasi di sini bukan jaminan ketersediaan pada saat commit.
+# ------------------------------------------------------------------------------
+
+@app.route('/kiosk/scan_copy', methods=['POST'])
+def kiosk_scan_copy():
+    """Validasi eksemplar dan tambahkan ke keranjang sementara session kiosk (Task 5-04).
+
+    Semua validasi READ-ONLY. Validasi ini tidak menjamin ketersediaan saat commit (Task 5-05).
+    """
+    if not request.is_json:
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Content-Type harus application/json'}), 400
+
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Body JSON tidak valid atau kosong'}), 400
+
+    code = data.get('code')
+    if not code or not isinstance(code, str) or not code.strip():
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Field "code" wajib diisi'}), 400
+
+    code = code.strip()
+    if not _KIOSK_QR_VALID_RE.match(code):
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Format kode tidak dikenali'}), 400
+
+    # Pastikan session anggota aktif
+    if not session.get('kiosk_member_id'):
+        return jsonify({
+            'status': 'error', 'error_code': 'SESSION_REQUIRED',
+            'message': 'Belum ada anggota dalam sesi. Scan kartu anggota terlebih dahulu.',
+        }), 403
+
+    # Pastikan kode adalah QR eksemplar (prefix C-)
+    if not code.upper().startswith('C-'):
+        return jsonify({'status': 'error', 'error_code': 'FORMAT_ERROR',
+                        'message': 'Kode yang dipindai bukan QR buku (harus diawali C-).'}), 400
+
+    # Ambil keranjang dari session
+    cart = list(session.get('kiosk_cart', []))
+
+    # Penegakan batas keranjang di server (K.01)
+    if len(cart) >= KIOSK_MAX_CART_SIZE:
+        return jsonify({
+            'status': 'error',
+            'error_code': 'CART_FULL',
+            'message': 'Keranjang sudah penuh (maks {} buku). Lanjutkan ke konfirmasi atau tekan Batal.'.format(
+                KIOSK_MAX_CART_SIZE),
+        }), 422
+
+    # Cek duplikat dalam keranjang
+    if any(item['copy_id'] == code for item in cart):
+        return jsonify({'status': 'error', 'error_code': 'DUPLICATE_COPY',
+                        'message': 'Buku ini sudah ada di keranjang.'}), 409
+
+    conn = get_connection()
+    try:
+        copy_obj = copy_repo.get_copy_by_id(conn, code)
+        if not copy_obj:
+            return jsonify({'status': 'error', 'error_code': 'COPY_NOT_FOUND',
+                            'message': 'Eksemplar buku tidak ditemukan di sistem.'}), 404
+
+        avail_list = copy_repo.get_copy_availability(conn, copy_id=code)
+        if not avail_list:
+            return jsonify({'status': 'error', 'error_code': 'COPY_NOT_FOUND',
+                            'message': 'Data ketersediaan eksemplar tidak ditemukan.'}), 404
+
+        avail = avail_list[0]
+
+        if avail.get('copy_status') != 'aktif':
+            return jsonify({
+                'status': 'error',
+                'error_code': 'COPY_NOT_ACTIVE',
+                'message': 'Eksemplar ini tidak dapat dipinjam (status: {}).'.format(
+                    avail.get('copy_status', 'tidak diketahui')),
+            }), 422
+
+        if avail.get('availability_status') != 'tersedia':
+            return jsonify({
+                'status': 'error',
+                'error_code': 'COPY_NOT_AVAILABLE',
+                'message': 'Eksemplar ini sedang dipinjam oleh anggota lain.',
+            }), 422
+
+        title  = copy_obj.get('title_judul', '')
+        author = copy_obj.get('title_penulis', '')
+    finally:
+        conn.close()
+
+    # Tambahkan ke keranjang sementara di session (tidak ada perubahan DB)
+    cart.append({'copy_id': code, 'title': title, 'author': author})
+    session['kiosk_cart'] = cart
+
+    return jsonify({
+        'status':     'copy_ok',
+        'copy_id':    code,
+        'title':      title,
+        'author':     author,
+        'cart_count': len(cart),
+    }), 200
+
+
+# ------------------------------------------------------------------------------
+# FASE 5 -- KIOSK: /kiosk/cancel (Task 5-04)
+# Membersihkan seluruh state transaksi sementara kiosk dari session.
+#
+# Kontrak:
+#   - Idempoten: aman dipanggil berulang kali.
+#   - Tidak mengakses database.
+#   - Menghapus kiosk_member_id, kiosk_member_name, kiosk_cart dari session.
+# ------------------------------------------------------------------------------
+
+@app.route('/kiosk/cancel', methods=['POST'])
+def kiosk_cancel():
+    """Batalkan sesi transaksi kiosk dan bersihkan seluruh state sementara (Task 5-04).
+
+    Idempoten: aman dipanggil berulang kali. Tidak mengakses database.
+    """
+    session.pop('kiosk_member_id',   None)
+    session.pop('kiosk_member_name', None)
+    session.pop('kiosk_cart',        None)
+    return jsonify({'status': 'cancelled'}), 200
+
+
 
 # ==========================================
 # DATABASE INITIALIZATION & APPLICATION RUNNER

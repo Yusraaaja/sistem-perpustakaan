@@ -41,6 +41,10 @@ from policy import (
     OFFICIAL_MEMBER_STATUSES,
     MIN_MEMBER_QR_REISSUE_REASON_LENGTH,
     MAX_MEMBER_QR_REISSUE_REASON_LENGTH,
+    MAX_MEMBER_CARDS_PER_PRINT,
+    DEFAULT_MEMBER_CARDS_PAGE_SIZE,
+    MEMBER_EXPORT_HEADERS,
+    MEMBER_EXPORT_FILENAME_PREFIX,
 )
 from . import qr_service
 from repositories import (
@@ -2153,6 +2157,312 @@ def clear_member_confirmation_tokens(conn: Optional[sqlite3.Connection] = None) 
                 target_conn.close()
             except Exception:
                 pass
+
+
+# ==============================================================================
+# PENCETAKAN KARTU ANGGOTA HEMAT TINTA & MASSAL (Task 4-08, DEC-008, LIB-QR-004)
+# ==============================================================================
+
+CATEGORY_DISPLAY_LABELS: Dict[str, str] = {
+    "murid": "Murid",
+    "guru_jurusan": "Guru Kejuruan",
+    "guru_umum": "Guru Umum",
+    "staf": "Staf / Tenaga Kependidikan",
+    "teknisi": "Teknisi / Laboran",
+}
+
+
+def format_category_label(jenis: Optional[str]) -> str:
+    """Format label kategori peran anggota untuk tampilan kartu fisik perpustakaan."""
+    if not jenis:
+        return "Anggota Perpustakaan"
+    clean = str(jenis).strip().lower()
+    return CATEGORY_DISPLAY_LABELS.get(clean, clean.replace('_', ' ').title())
+
+
+def parse_member_ids(input_data: Union[str, Sequence[str], None]) -> List[str]:
+    """
+    Mem-parsing input ID anggota dari berbagai format (string koma/baris baru/spasi atau list/tuple),
+    membersihkan whitespace, menormalkan format uppercase, membuang token kosong,
+    dan menghapus duplikasi tanpa mengubah urutan kemunculan pertama (Task 4-08).
+    """
+    if not input_data:
+        return []
+
+    import re
+    tokens: List[str] = []
+    if isinstance(input_data, str):
+        raw_tokens = re.split(r'[\r\n,;\s]+', input_data)
+        tokens = [t.strip().upper() for t in raw_tokens if t.strip()]
+    elif isinstance(input_data, (list, tuple, set)):
+        for item in input_data:
+            if item is not None:
+                raw_tokens = re.split(r'[\r\n,;\s]+', str(item))
+                tokens.extend([t.strip().upper() for t in raw_tokens if t.strip()])
+    else:
+        raw_tokens = re.split(r'[\r\n,;\s]+', str(input_data))
+        tokens = [t.strip().upper() for t in raw_tokens if t.strip()]
+
+    seen: Set[str] = set()
+    unique_ids: List[str] = []
+    for tok in tokens:
+        if tok not in seen:
+            seen.add(tok)
+            unique_ids.append(tok)
+
+    return unique_ids
+
+
+def get_member_card_data(
+    conn: sqlite3.Connection,
+    member_id: str,
+    secret_key: Optional[Union[str, bytes]] = None,
+) -> Dict[str, Any]:
+    """
+    Menyiapkan data satu kartu anggota siap cetak hemat tinta (Task 4-08, DEC-008, LIB-QR-004).
+    Mengambil data anggota dari database, menghasilkan token QR resmi HMAC-SHA256,
+    dan merender SVG QR Code monokrom berpresisi tinggi.
+
+    Menjamin:
+    - Zero PII (DEC-023): Tidak memuat nomor telepon maupun kelas/rombel.
+    - Zero Mutation (Read-Only): Operasi pembacaan murni tanpa modifikasi data anggota.
+    - Preservasi Status: Anggota berstatus nonaktif tetap dapat dicetak dengan label jelas
+      '[Status: Nonaktif]' tanpa mengubah status di database.
+    """
+    if not member_id or not str(member_id).strip():
+        raise ValidationError("ID Anggota tidak boleh kosong.")
+    clean_id = str(member_id).strip().upper()
+
+    qr_res = get_member_qr(conn=conn, member_id=clean_id, secret_key=secret_key)
+    member = qr_res.get("member") or {}
+
+    jenis = member.get("category_jenis") or ""
+    keterangan = member.get("category_keterangan") or ""
+    kategori_label = format_category_label(jenis)
+
+    status = (member.get("status") or "aktif").lower()
+    status_label = "Aktif" if status == "aktif" else "Nonaktif"
+
+    return {
+        "member_id": clean_id,
+        "nama": member.get("nama") or "",
+        "status": status,
+        "status_label": status_label,
+        "category_id": member.get("category_id") or "",
+        "category_jenis": jenis,
+        "category_keterangan": keterangan,
+        "kategori_label": kategori_label,
+        "qr_version": qr_res["qr_version"],
+        "token": qr_res["token"],
+        "qr_svg": qr_res["qr_svg"],
+        "created_at": member.get("created_at") or "",
+    }
+
+
+def get_member_cards_for_printing(
+    conn: sqlite3.Connection,
+    member_ids: Optional[Sequence[str]] = None,
+    status: Optional[str] = None,
+    category_id: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: Optional[int] = None,
+    secret_key: Optional[Union[str, bytes]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Mengambil daftar kartu anggota siap cetak massal berdasarkan daftar ID atau kriteria filter pencarian.
+    Dibatasi oleh MAX_MEMBER_CARDS_PER_PRINT untuk menjamin performa cetak dan efisiensi memori browser.
+    Menerapkan deduplikasi ID dengan mempertahankan urutan masukan asli.
+    MURNI BACA (READ-ONLY) - Tidak memutasi database.
+    """
+    max_limit = MAX_MEMBER_CARDS_PER_PRINT
+    effective_limit = min(limit, max_limit) if limit and limit > 0 else max_limit
+
+    cards: List[Dict[str, Any]] = []
+
+    if member_ids:
+        cleaned_ids = parse_member_ids(member_ids)
+        target_ids = cleaned_ids[:effective_limit]
+        for mid in target_ids:
+            try:
+                card = get_member_card_data(conn=conn, member_id=mid, secret_key=secret_key)
+                cards.append(card)
+            except MemberNotFoundError:
+                # Mengabaikan ID yang tidak ada agar kartu yang valid tetap dicetak
+                continue
+    else:
+        members = member_repo.list_members(
+            conn=conn,
+            status=status,
+            category_id=category_id,
+            search=search,
+            limit=effective_limit,
+            offset=0,
+        )
+        for m in members:
+            try:
+                card = get_member_card_data(conn=conn, member_id=m["id"], secret_key=secret_key)
+                cards.append(card)
+            except MemberNotFoundError:
+                continue
+
+    return cards
+
+
+def sanitize_export_cell(value: Any) -> str:
+    """
+    Mensterilkan sel ekspor teks untuk mencegah kerentanan CSV Formula Injection (CWE-1236).
+    Jika nilai diawali karakter pemicu formula ('=', '+', '-', '@', '\t', '\r'),
+    nilai akan diawali dengan tanda kutip tunggal (') agar dibaca sebagai teks biasa oleh spreadsheet.
+    """
+    if value is None:
+        return ""
+    val_str = str(value).strip()
+    if not val_str:
+        return ""
+    if any(val_str.startswith(p) for p in FORMULA_PREFIXES):
+        return f"'{val_str}"
+    return val_str
+
+
+def export_members_data(
+    conn: sqlite3.Connection,
+    status: Optional[str] = None,
+    category_id: Optional[str] = None,
+    search: Optional[str] = None,
+    sanitize_formulas: bool = True,
+) -> List[Dict[str, Any]]:
+    """
+    Mengambil data anggota untuk kebutuhan ekspor dengan id_anggota (Task 4-09, OPEN-011, DEC-023).
+    Menjamin:
+    - Zero PII (DEC-023): Tidak ada nomor telepon maupun kelas/rombel.
+    - Zero-Write (Murni Baca): Tidak ada mutasi atau penulisan ke database.
+    - Menyertakan id_anggota sebagai identitas utama buatan sistem untuk siklus impor ulang yang aman.
+    """
+    raw_members = member_repo.get_all_members_for_export(
+        conn=conn,
+        status=status,
+        category_id=category_id,
+        search=search,
+    )
+
+    results: List[Dict[str, Any]] = []
+    for m in raw_members:
+        id_anggota = m.get("id_anggota") or m.get("id") or ""
+        nama = m.get("nama") or ""
+        jenis = m.get("jenis") or ""
+        keterangan = m.get("keterangan") or ""
+        member_status = m.get("status") or "aktif"
+
+        if sanitize_formulas:
+            nama = sanitize_export_cell(nama)
+            jenis = sanitize_export_cell(jenis)
+            keterangan = sanitize_export_cell(keterangan)
+
+        results.append({
+            "id_anggota": str(id_anggota).strip(),
+            "nama": str(nama),
+            "jenis": str(jenis),
+            "keterangan": str(keterangan),
+            "status": str(member_status),
+        })
+
+    return results
+
+
+def generate_members_export_csv(
+    conn: sqlite3.Connection,
+    status: Optional[str] = None,
+    category_id: Optional[str] = None,
+    search: Optional[str] = None,
+) -> str:
+    """
+    Menghasilkan string CSV ekspor data anggota menyertakan id_anggota (Task 4-09).
+    Menggunakan header standar resmi: id_anggota,nama,jenis,keterangan,status.
+    Menerapkan sanitasi anti formula injection pada setiap sel.
+    """
+    data = export_members_data(
+        conn=conn,
+        status=status,
+        category_id=category_id,
+        search=search,
+        sanitize_formulas=True,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="\r\n", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(list(MEMBER_EXPORT_HEADERS))
+
+    for item in data:
+        row = [item.get(col, "") for col in MEMBER_EXPORT_HEADERS]
+        writer.writerow(row)
+
+    return output.getvalue()
+
+
+def get_members_export_download_payload(
+    conn: sqlite3.Connection,
+    format_type: str = "csv",
+    status: Optional[str] = None,
+    category_id: Optional[str] = None,
+    search: Optional[str] = None,
+) -> Tuple[bytes, str, str]:
+    """
+    Menyiapkan payload biner, nama berkas, dan mimetype untuk unduhan ekspor anggota.
+    Mendukung format 'csv' (default, UTF-8 dengan BOM) dan 'xlsx' (Excel).
+    """
+    now_utc = timeutil.now_utc()
+    timestamp_str = timeutil.format_school(now_utc, "%Y%m%d_%H%M%S")
+
+    clean_fmt = str(format_type).strip().lower()
+
+    if clean_fmt == "xlsx":
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ValidationError("Pustaka pandas/openpyxl tidak tersedia untuk ekspor Excel.")
+
+        data = export_members_data(
+            conn=conn,
+            status=status,
+            category_id=category_id,
+            search=search,
+            sanitize_formulas=False,
+        )
+
+        df = pd.DataFrame(data, columns=list(MEMBER_EXPORT_HEADERS))
+        df.rename(
+            columns={
+                "id_anggota": "ID Anggota",
+                "nama": "Nama",
+                "jenis": "Jenis",
+                "keterangan": "Keterangan",
+                "status": "Status",
+            },
+            inplace=True,
+        )
+
+        excel_buf = io.BytesIO()
+        with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Data Anggota")
+        excel_buf.seek(0)
+
+        filename = f"{MEMBER_EXPORT_FILENAME_PREFIX}_{timestamp_str}.xlsx"
+        mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        return excel_buf.getvalue(), filename, mimetype
+
+    # Default: CSV ber-BOM UTF-8
+    csv_text = generate_members_export_csv(
+        conn=conn,
+        status=status,
+        category_id=category_id,
+        search=search,
+    )
+    csv_bytes = csv_text.encode("utf-8-sig")
+    filename = f"{MEMBER_EXPORT_FILENAME_PREFIX}_{timestamp_str}.csv"
+    mimetype = "text/csv"
+    return csv_bytes, filename, mimetype
+
+
 
 
 
