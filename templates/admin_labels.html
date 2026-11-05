@@ -1,0 +1,340 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<style>
+/* CSS Ukuran Kertas & Tampilan Cetak (Task 3-08) */
+@page {
+    size: A4 portrait;
+    margin: 10mm;
+}
+
+/* Gaya Tampilan Layar (Screen) */
+.label-controls-bar {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+
+.labels-sheet-preview {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.labels-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.label-card {
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+    min-height: 110px;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.label-card:hover {
+    border-color: #6366f1;
+}
+
+.label-qr {
+    width: 82px;
+    height: 82px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.label-qr svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.label-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.label-school {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin-bottom: 2px;
+}
+
+.label-id {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: 0.8px;
+    line-height: 1.2;
+    margin-bottom: 3px;
+}
+
+.label-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #1e293b;
+    line-height: 1.25;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    margin-bottom: 2px;
+}
+
+.label-meta {
+    font-size: 0.68rem;
+    color: #64748b;
+}
+
+/* CSS Khusus Mode Cetak (@media print) */
+@media print {
+    /* Sembunyikan semua kontrol navigasi, tombol, header situs, dan footer */
+    .no-print,
+    .navbar,
+    .sidebar,
+    nav,
+    header,
+    footer,
+    .btn,
+    .alert,
+    form,
+    #sidebar,
+    .sidebar-wrapper,
+    .header-area,
+    .toast,
+    .modal {
+        display: none !important;
+    }
+
+    body, html {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .container, .container-fluid, main, .main-content {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .labels-sheet-preview {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .labels-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 3.5mm !important;
+        width: 100% !important;
+    }
+
+    .label-card {
+        border: 1px dashed #666666 !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+        height: 32mm !important;
+        max-height: 32mm !important;
+        padding: 2.5mm 3mm !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 3mm !important;
+        box-sizing: border-box !important;
+    }
+
+    .label-qr {
+        width: 24mm !important;
+        height: 24mm !important;
+        flex-shrink: 0 !important;
+    }
+
+    .label-qr svg {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    .label-school {
+        color: #555555 !important;
+        font-size: 6pt !important;
+    }
+
+    .label-id {
+        color: #000000 !important;
+        font-size: 10.5pt !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    .label-title {
+        color: #000000 !important;
+        font-size: 7.5pt !important;
+        line-height: 1.2 !important;
+    }
+
+    .label-meta {
+        color: #555555 !important;
+        font-size: 6pt !important;
+    }
+}
+</style>
+
+<div class="container-fluid px-3 px-md-4 py-3">
+    <!-- Kontrol Layar & Filter (Hanya tampil di browser, tidak ikut tercetak) -->
+    <div class="no-print">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge rounded-pill fw-medium" style="background-color: #EEF2FF; color: #4F46E5; font-size: 0.75rem; padding: 4px 10px;">
+                        Fase 3: Label QR Eksemplar
+                    </span>
+                    {% if is_reprint %}
+                    <span class="badge rounded-pill fw-medium bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size: 0.75rem; padding: 4px 10px;">
+                        <i class="bi bi-arrow-repeat"></i> Mode Cetak Ulang (ID & QR Identik)
+                    </span>
+                    {% endif %}
+                    <h4 class="page-title mb-0">{% if is_reprint %}Cetak Ulang Label QR Eksemplar{% else %}Cetak Label QR Eksemplar Buku{% endif %}</h4>
+                </div>
+                <p class="text-muted small mb-0">
+                    {% if is_reprint %}
+                    Mencetak ulang label untuk eksemplar terpilih dengan ID dan payload QR yang identik secara deterministik.
+                    {% else %}
+                    Tata letak grid standar kertas A4 (3 kolom). Setiap label memuat QR identitas eksemplar, ID terbaca manusia, dan judul singkat buku.
+                    {% endif %}
+                </p>
+            </div>
+            
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" class="btn btn-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-xs" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Cetak Label (Print)
+                </button>
+                <a href="{{ url_for('admin_labels_reprint') }}" class="btn btn-outline-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
+                    <i class="bi bi-arrow-repeat"></i> Cetak Ulang
+                </a>
+                <a href="{{ url_for('admin_labels_tanpa_label') }}" class="btn btn-outline-secondary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
+                    <i class="bi bi-tag"></i> Eksemplar Tanpa Label
+                </a>
+                <a href="/koleksi" class="btn btn-light border px-3 py-2 fw-semibold text-secondary d-inline-flex align-items-center gap-1.5 shadow-xs" style="background-color: #FFFFFF; border-color: #E2E8F0 !important;">
+                    <i class="bi bi-arrow-left"></i> Katalog
+                </a>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="label-controls-bar d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 shadow-xs">
+            <form method="GET" action="{{ url_for('admin_labels') }}" class="d-flex flex-grow-1 align-items-center gap-2 flex-wrap">
+                {% if filter_title_id %}
+                <input type="hidden" name="title_id" value="{{ filter_title_id }}">
+                {% endif %}
+                <div class="input-group" style="max-width: 380px;">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" value="{{ filter_search }}" class="form-control border-start-0" placeholder="Cari ID eksemplar, judul, penulis...">
+                </div>
+                <button type="submit" class="btn btn-outline-primary px-3 py-2 fw-semibold">
+                    Terapkan Filter
+                </button>
+                {% if filter_search or filter_title_id or filter_copy_ids %}
+                <a href="{{ url_for('admin_labels') }}" class="btn btn-link text-decoration-none text-muted px-2">
+                    <i class="bi bi-x-circle"></i> Reset Filter
+                </a>
+                {% endif %}
+            </form>
+
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <span class="badge bg-secondary-subtle text-secondary px-3 py-2 fs-7 fw-semibold border">
+                    Total: {{ total_labels }} Label Siap Cetak
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kondisi Kosong (Empty State) -->
+    {% if not labels %}
+    <div class="card border-0 shadow-sm rounded-4 p-4 text-center my-4">
+        <div class="py-5">
+            <div class="mb-3 text-muted">
+                <i class="bi bi-qr-code-scan" style="font-size: 3.5rem; color: #94A3B8;"></i>
+            </div>
+            <h5 class="fw-bold text-dark">Tidak Ada Eksemplar yang Ditemukan</h5>
+            <p class="text-muted mb-4" style="max-width: 480px; margin: 0 auto; font-size: 0.95rem;">
+                Belum ada eksemplar buku aktif yang cocok dengan filter saat ini. Silakan tambahkan buku baru atau periksa kriteria pencarian Anda.
+            </p>
+            <div class="d-flex justify-content-center gap-2">
+                <a href="/buku/tambah" class="btn btn-primary px-3 py-2 fw-semibold">
+                    <i class="bi bi-plus-lg"></i> Tambah Buku Baru
+                </a>
+                <a href="{{ url_for('admin_labels') }}" class="btn btn-outline-secondary px-3 py-2 fw-semibold">
+                    <i class="bi bi-arrow-repeat"></i> Tampilkan Semua
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+
+    <!-- Sheet Grid Label Siap Cetak -->
+    <div class="labels-sheet-preview">
+        <div class="labels-grid">
+            {% for label in labels %}
+            <div class="label-card">
+                <!-- QR Code (HANYA dan STRICTLY memuat copy_id) -->
+                <div class="label-qr" title="QR Payload: {{ label.copy_id }}">
+                    {{ label.qr_svg | safe }}
+                </div>
+                
+                <!-- ID Terbaca Manusia & Judul Singkat -->
+                <div class="label-info">
+                    <div class="label-school">PERPUSTAKAAN DIGITAL</div>
+                    <div class="label-id">{{ label.copy_id }}</div>
+                    <div class="label-title" title="{{ label.full_title }}">{{ label.short_title }}</div>
+                    {% if label.call_number or label.lokasi_rak or label.kategori %}
+                    <div class="label-meta">
+                        {% if label.call_number %}
+                            {{ label.call_number }}
+                        {% elif label.kategori %}
+                            {{ label.kategori }}
+                        {% endif %}
+                        {% if (label.call_number or label.kategori) and label.lokasi_rak %}
+                            &bull; Rak: {{ label.lokasi_rak }}
+                        {% elif label.lokasi_rak %}
+                            Rak: {{ label.lokasi_rak }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

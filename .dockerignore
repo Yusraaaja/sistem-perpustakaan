@@ -1,0 +1,44 @@
+# Git & VCS
+.git
+.gitignore
+
+# Python Bytecode & Virtual Environments
+__pycache__
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+
+# Environment Variables & Kredensial Sensitif
+.env
+.env.*
+!.env.example
+
+# Database Lokal & Backup
+*.db
+*.db-wal
+*.db-shm
+backups/
+scratch/
+archive/
+
+# Editor & Tooling
+.vscode/
+.idea/
+.kilo/
+*.swp
+*~
+
+# Script Windows Lokal
+*.bat
+*.lnk
+
+# Berkas Spreadsheet Pengujian
+*.xlsx
+*.xls
+
+# Dockerfile & Build Files
+Dockerfile*
+.dockerignore
+

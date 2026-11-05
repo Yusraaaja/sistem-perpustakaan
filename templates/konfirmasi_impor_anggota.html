@@ -1,0 +1,200 @@
+{% extends 'layout.html' %}
+
+{% block title %}Konfirmasi Komit Impor Anggota - Sistem Perpustakaan Digital{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+
+        <!-- Header Halaman & Breadcrumb -->
+        <div class="mb-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2 small">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_members') }}" class="text-decoration-none">Anggota</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('panduan_impor_anggota') }}" class="text-decoration-none">Impor Anggota</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Konfirmasi Komit</li>
+                </ol>
+            </nav>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-1">Konfirmasi Komit Impor Anggota</h2>
+                    <p class="text-muted small mb-0">
+                        Periksa kembali data ringkasan sebelum transaksi atomik dijalankan ke dalam basis data.
+                    </p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge rounded-pill bg-light text-dark border px-3 py-2 small">
+                        <i class="bi bi-file-earmark-spreadsheet me-1 text-success"></i> {{ filename }}
+                    </span>
+                    <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-2 small">
+                        <i class="bi bi-clock-history me-1"></i> Berlaku 15 Menit
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Peringatan Komit -->
+        <div class="alert alert-warning border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #FEF3C7; color: #D97706; width: 40px; height: 40px; flex-shrink: 0;">
+                    <i class="bi bi-shield-lock-fill fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-warning-emphasis mb-1">Perhatian: Transaksi Atomik (BEGIN IMMEDIATE)</h6>
+                    <p class="small text-warning-emphasis mb-0" style="line-height: 1.55;">
+                        Dengan menekan tombol <strong>"Ya, Commit Impor Anggota Sekarang"</strong>, sistem akan membuat anggota baru dan memperbarui data anggota secara atomik dalam satu transaksi database.
+                        Jika terjadi kegagalan di tengah proses, seluruh perubahan akan dibatalkan secara penuh (rollback) tanpa meninggalkan anggota parsial.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kartu Ringkasan Metrik Rencana Komit -->
+        <div class="row g-3 mb-4">
+            <!-- 1. Total Baris Rencana -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Total Baris</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #EEF2FF; color: #4F46E5; width: 34px; height: 34px;">
+                            <i class="bi bi-list-ol"></i>
+                        </div>
+                    </div>
+                    <div class="fs-3 fw-bold text-primary">{{ confirmation_stats.total_rencana }}</div>
+                    <div class="text-muted small" style="font-size: 0.76rem;">Total baris CSV diproses</div>
+                </div>
+            </div>
+
+            <!-- 2. Anggota Baru Dibuat -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Anggota Baru</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #DCFCE7; color: #16A34A; width: 34px; height: 34px;">
+                            <i class="bi bi-person-plus-fill"></i>
+                        </div>
+                    </div>
+                    <div class="fs-3 fw-bold text-success">{{ confirmation_stats.buat_baru_rencana }}</div>
+                    <div class="text-muted small" style="font-size: 0.76rem;">ID otomatis baru</div>
+                </div>
+            </div>
+
+            <!-- 3. Anggota Diperbarui -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Diperbarui</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #FEF3C7; color: #D97706; width: 34px; height: 34px;">
+                            <i class="bi bi-person-check-fill"></i>
+                        </div>
+                    </div>
+                    <div class="fs-3 fw-bold text-warning">{{ confirmation_stats.perbarui_rencana }}</div>
+                    <div class="text-muted small" style="font-size: 0.76rem;">Pembaruan data terdaftar</div>
+                </div>
+            </div>
+
+            <!-- 4. Baris Dilewati -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Dilewati</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #F1F5F9; color: #64748B; width: 34px; height: 34px;">
+                            <i class="bi bi-skip-forward-fill"></i>
+                        </div>
+                    </div>
+                    <div class="fs-3 fw-bold text-secondary">{{ confirmation_stats.lewati_rencana }}</div>
+                    <div class="text-muted small" style="font-size: 0.76rem;">Tidak diproses ke database</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabel Rencana Eksekusi Per Baris -->
+        <div class="card app-card border-0 shadow-sm rounded-4 p-4 mb-4">
+            <h6 class="fw-bold text-dark mb-3">Detail Rencana Eksekusi Per Baris</h6>
+            <div class="table-responsive rounded-3 border">
+                <table class="table table-hover table-sm align-middle small mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3" style="width: 8%;">Baris</th>
+                            <th style="width: 32%;">Nama Anggota &amp; Kategori</th>
+                            <th style="width: 25%;">Status &amp; Keterangan</th>
+                            <th style="width: 35%;">Keputusan Tindakan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview.rows %}
+                            {% set dec = decisions.get(row.row_num) or decisions.get(row.row_num|string) or {} %}
+                            {% set act = dec.action or row.selected_action %}
+                            <tr>
+                                <td class="ps-3 fw-bold text-secondary">
+                                    <span class="badge bg-light text-dark border">#{{ row.row_num }}</span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ row.clean_data.nama or row.raw_data.nama }}</div>
+                                    <div class="d-flex gap-1 mt-1">
+                                        <span class="badge rounded-pill bg-light text-secondary border" style="font-size: 0.72rem;">
+                                            {{ row.clean_data.jenis or row.raw_data.jenis }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge rounded-pill {% if row.clean_data.status == 'aktif' %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}" style="font-size: 0.72rem;">
+                                        {{ row.clean_data.status or 'aktif' }}
+                                    </span>
+                                    {% if row.clean_data.keterangan %}
+                                        <div class="text-muted small mt-1" style="font-size: 0.72rem;">
+                                            {{ row.clean_data.keterangan }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if act == 'BUAT_BARU' %}
+                                        <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-semibold">
+                                            <i class="bi bi-person-plus me-1"></i> Buat Anggota Baru
+                                        </span>
+                                    {% elif act == 'PERBARUI' %}
+                                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 fw-semibold">
+                                            <i class="bi bi-person-check me-1"></i> Perbarui: <code>{{ dec.target_member_id or row.target_member_id }}</code>
+                                        </span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1 fw-semibold">
+                                            <i class="bi bi-skip-forward me-1"></i> Lewati
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Form Commit Final -->
+        <div class="card app-card border-0 shadow-sm rounded-4 p-4" style="background-color: #F8FAFC;">
+            <form method="POST" action="{{ url_for('commit_impor_anggota') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="confirm_token" value="{{ confirm_token }}">
+                <input type="hidden" name="raw_csv_b64" value="{{ raw_csv_b64 }}">
+
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1">Siap Menyimpan ke Database?</h6>
+                        <p class="text-muted small mb-0">
+                            Token konfirmasi berlaku 15 menit. Klik tombol di kanan untuk mengeksekusi komit atomik.
+                        </p>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <a href="{{ url_for('panduan_impor_anggota') }}" class="btn btn-outline-secondary btn-sm px-3 py-2 fw-semibold rounded-3">
+                            <i class="bi bi-x-circle me-1"></i> Batal
+                        </a>
+                        <button type="submit" class="btn btn-success btn-sm px-4 py-2 fw-semibold rounded-3 shadow-sm">
+                            <i class="bi bi-check2-circle me-1"></i> Ya, Commit Impor Anggota Sekarang
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

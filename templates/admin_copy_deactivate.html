@@ -1,0 +1,259 @@
+{% extends 'layout.html' %}
+
+{% block title %}Nonaktifkan Eksemplar {{ copy.id }} - Sistem Perpustakaan Digital{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+
+        <!-- Breadcrumb & Header Halaman -->
+        <div class="mb-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2 small">
+                    <li class="breadcrumb-item"><a href="/koleksi" class="text-decoration-none">Koleksi</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_labels_tanpa_label') }}" class="text-decoration-none">Eksemplar di Rak</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Nonaktifkan Eksemplar</li>
+                </ol>
+            </nav>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-1">Nonaktifkan / Tandai Eksemplar Buku</h2>
+                    <p class="text-muted small mb-0">
+                        Penonaktifan fisik aset buku individual disertai alasan wajib dan pencatatan audit log (Task 3-10).
+                    </p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge rounded-pill bg-light text-dark border px-3 py-2 font-monospace fs-7">
+                        <i class="bi bi-upc-scan me-1 text-primary"></i> {{ copy.id }}
+                    </span>
+                    {% if current_status == 'aktif' %}
+                    <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 small">
+                        <i class="bi bi-check-circle me-1"></i> Aktif
+                    </span>
+                    {% else %}
+                    <span class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-2 small">
+                        <i class="bi bi-slash-circle me-1"></i> {{ current_status|title }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Banner Kebijakan Integritas Data & Tanpa Hard Delete (P2-02, R12) -->
+        <div class="alert alert-info border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #E0F2FE; color: #0369A1; width: 42px; height: 42px; flex-shrink: 0;">
+                    <i class="bi bi-shield-check fs-4"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Kebijakan Integritas & Tanpa Hard Delete (P2-02, R12)</h6>
+                    <p class="small text-secondary mb-0" style="line-height: 1.55;">
+                        Eksemplar fisik buku <strong>tidak akan pernah dihapus secara permanen (tanpa hard delete)</strong> dari sistem.
+                        Nomor inventaris, riwayat sirkulasi, dan jejak peminjaman tetap utuh dalam basis data.
+                        Status eksemplar akan diperbarui menjadi nonaktif sehingga tidak dapat dipinjam kembali di kiosk peminjaman mandiri.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Warning jika eksemplar sedang dipinjam aktif -->
+        {% if active_loan %}
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #FEE2E2; color: #DC2626; width: 42px; height: 42px; flex-shrink: 0;">
+                    <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-danger mb-1">Eksemplar Sedang Berada Dalam Peminjaman Aktif!</h6>
+                    <p class="small text-danger-emphasis mb-0" style="line-height: 1.55;">
+                        Eksemplar ini tercatat sedang dipinjam oleh <strong>{{ active_loan.member_nama or active_loan.legacy_nama_peminjam or 'Anggota' }}</strong>.
+                        Berdasarkan aturan konsistensi sirkulasi (LIB-LOAN-002), eksemplar yang sedang dipinjam tidak dapat dinonaktifkan.
+                        Selesaikan transaksi pengembalian buku terlebih dahulu sebelum menandai eksemplar ini.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% elif not can_deactivate %}
+        <div class="alert alert-warning border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #FEF3C7; color: #D97706; width: 42px; height: 42px; flex-shrink: 0;">
+                    <i class="bi bi-info-circle-fill fs-4"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-warning-emphasis mb-1">Eksemplar Sudah Tidak Aktif</h6>
+                    <p class="small text-warning-emphasis mb-0" style="line-height: 1.55;">
+                        Eksemplar ini saat ini sudah berstatus <strong>{{ current_status }}</strong>.
+                        Operasi penonaktifan tidak dapat dijalankan ulang untuk mencegah data audit duplikat (idempoten).
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if error_message %}
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 p-3 mb-4">
+            <div class="d-flex align-items-center gap-2 text-danger">
+                <i class="bi bi-x-circle-fill"></i>
+                <span class="small fw-semibold">{{ error_message }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Detail Informasi Eksemplar -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+            <div class="card-header bg-white border-bottom py-3 px-4">
+                <h6 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-journal-text text-primary me-2"></i>Informasi Eksemplar Fisik
+                </h6>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small mb-1">ID Eksemplar Fisik</label>
+                        <div class="font-monospace fw-bold text-dark fs-6">{{ copy.id }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small mb-1">Status Saat Ini</label>
+                        <div>
+                            {% if current_status == 'aktif' %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1">Aktif</span>
+                            {% elif current_status == 'rusak' %}
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1">Rusak</span>
+                            {% elif current_status == 'hilang' %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1">Hilang</span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2.5 py-1">{{ current_status|title }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-muted small mb-1">Judul Buku</label>
+                        <div class="fw-bold text-dark fs-5">{{ copy.title_judul or copy.judul or '-' }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small mb-1">Penulis</label>
+                        <div class="text-secondary">{{ copy.title_penulis or copy.penulis or '-' }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small mb-1">Kategori</label>
+                        <div class="text-secondary">{{ copy.title_kategori or copy.kategori or '-' }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small mb-1">Lokasi Rak</label>
+                        <div class="text-secondary">
+                            {% if copy.lokasi_rak or copy.rak %}
+                            <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">{{ copy.lokasi_rak or copy.rak }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small mb-1">Nomor Panggil</label>
+                        <div class="text-secondary font-monospace">{{ copy.nomor_panggil or copy.no_panggil or '-' }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Penonaktifan Eksemplar -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+            <div class="card-header bg-white border-bottom py-3 px-4">
+                <h6 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-pencil-square text-primary me-2"></i>Formulir Penonaktifan & Pencatatan Audit
+                </h6>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('admin_copy_deactivate', copy_id=copy.id) }}" id="formDeactivateCopy">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                    <div class="mb-3">
+                        <label for="target_status" class="form-label fw-semibold text-dark small">
+                            Status Baru Eksemplar <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="target_status" name="target_status" {% if not can_deactivate %}disabled{% endif %} required>
+                            <option value="nonaktif" {% if target_status == 'nonaktif' %}selected{% endif %}>
+                                Nonaktifkan dari Koleksi (nonaktif) - Default
+                            </option>
+                            <option value="rusak" {% if target_status == 'rusak' %}selected{% endif %}>
+                                Rusak Fisik / Butuh Perbaikan (rusak)
+                            </option>
+                            <option value="hilang" {% if target_status == 'hilang' %}selected{% endif %}>
+                                Hilang / Tidak Ditemukan di Rak (hilang)
+                            </option>
+                            <option value="dalam_penanganan" {% if target_status == 'dalam_penanganan' %}selected{% endif %}>
+                                Dalam Penanganan / Karantina (dalam_penanganan)
+                            </option>
+                        </select>
+                        <div class="form-text small text-muted">
+                            Pilih status penonaktifan yang sesuai dengan kondisi fisik riil eksemplar di lapangan.
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="reason" class="form-label fw-semibold text-dark small">
+                            Alasan Penonaktifan <span class="text-danger">* (Wajib & Bermakna, 5-500 Karakter)</span>
+                        </label>
+                        <textarea 
+                            class="form-control font-sans" 
+                            id="reason" 
+                            name="reason" 
+                            rows="4" 
+                            minlength="5" 
+                            maxlength="500" 
+                            placeholder="Contoh: Buku robek parah pada cover dan bab pertama saat inventarisasi rak..."
+                            {% if not can_deactivate %}disabled{% endif %}
+                            required>{{ reason or '' }}</textarea>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <span class="form-text small text-muted">
+                                Alasan ini dicatat secara permanen ke tabel <code>audit_log</code> bersama identitas petugas.
+                            </span>
+                            <span class="small text-muted" id="charCounter">0 / 500</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between pt-3 border-top">
+                        <a href="{{ url_for('admin_labels_tanpa_label') }}" class="btn btn-outline-secondary px-4 py-2 fw-semibold shadow-xs">
+                            <i class="bi bi-arrow-left me-1"></i> Batal & Kembali
+                        </a>
+                        <button 
+                            type="submit" 
+                            class="btn btn-danger px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-xs" 
+                            id="btnSubmitDeactivate"
+                            {% if not can_deactivate %}disabled{% endif %}>
+                            <i class="bi bi-slash-circle"></i> Konfirmasi Penonaktifan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var reasonInput = document.getElementById('reason');
+    var charCounter = document.getElementById('charCounter');
+    
+    function updateCounter() {
+        if (!reasonInput || !charCounter) return;
+        var len = reasonInput.value.length;
+        charCounter.textContent = len + ' / 500';
+        if (len < 5) {
+            charCounter.className = 'small text-danger fw-semibold';
+        } else if (len > 480) {
+            charCounter.className = 'small text-warning fw-semibold';
+        } else {
+            charCounter.className = 'small text-muted';
+        }
+    }
+
+    if (reasonInput) {
+        reasonInput.addEventListener('input', updateCounter);
+        updateCounter();
+    }
+});
+</script>
+{% endblock %}
+

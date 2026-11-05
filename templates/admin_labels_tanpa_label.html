@@ -1,0 +1,218 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3">
+    <!-- Header Halaman -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge rounded-pill fw-medium" style="background-color: #FEF3C7; color: #92400E; font-size: 0.75rem; padding: 4px 10px;">
+                    Task 3-09: Inventarisasi Fisik Rak
+                </span>
+                <h4 class="page-title mb-0">Eksemplar Tanpa Label & Buku Lama di Rak</h4>
+            </div>
+            <p class="text-muted small mb-0">
+                Daftar eksemplar buku lama (legacy) dan eksemplar aktif di rak yang perlu diverifikasi fisik label QR-nya oleh petugas perpustakaan.
+            </p>
+        </div>
+        
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="{{ url_for('admin_labels') }}" class="btn btn-outline-secondary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
+                <i class="bi bi-grid-3x3"></i> Semua Label
+            </a>
+            <a href="{{ url_for('admin_labels_reprint') }}" class="btn btn-outline-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs">
+                <i class="bi bi-arrow-repeat"></i> Cetak Ulang Label
+            </a>
+            <a href="/koleksi" class="btn btn-light border px-3 py-2 fw-semibold text-secondary d-inline-flex align-items-center gap-1.5 shadow-xs" style="background-color: #FFFFFF; border-color: #E2E8F0 !important;">
+                <i class="bi bi-arrow-left"></i> Katalog
+            </a>
+        </div>
+    </div>
+
+    <!-- Alert Batasan Sistem & Prinsip Operasional -->
+    <div class="alert alert-light border border-secondary-subtle rounded-3 shadow-xs p-3 mb-3">
+        <div class="d-flex gap-3">
+            <div class="text-primary fs-4 mt-0"><i class="bi bi-shield-check"></i></div>
+            <div class="small text-secondary">
+                <div class="fw-semibold text-dark mb-1">Catatan Operasional & Batasan Sistem:</div>
+                <p class="mb-1">
+                    Sistem database <strong>tidak mencatat status penempelan fisik stiker di rak buku</strong> secara otomatis. Halaman ini menyajikan daftar eksemplar buku lama (hasil migrasi sistem legacy) dan eksemplar aktif di rak sebagai panduan verifikasi fisik bagi petugas (OPEN-012, DEC-011).
+                </p>
+                <div class="text-muted">
+                    Petugas dapat mencari buku berdasarkan lokasi rak atau nomor panggil, memeriksa fisik buku di rak, lalu mencetak label QR resmi dengan mencentang eksemplar di bawah ini.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="bg-white border rounded-3 p-3 mb-3 shadow-xs">
+        <form method="GET" action="{{ url_for('admin_labels_tanpa_label') }}" class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+            <div class="d-flex flex-grow-1 align-items-center gap-2 flex-wrap">
+                <div class="input-group" style="max-width: 320px;">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" value="{{ filter_search }}" class="form-control border-start-0" placeholder="Cari ID, no. reg lama, judul...">
+                </div>
+
+                <div class="input-group" style="max-width: 200px;">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-geo-alt"></i></span>
+                    <input type="text" name="lokasi_rak" value="{{ filter_lokasi_rak }}" class="form-control border-start-0" placeholder="Lokasi rak...">
+                </div>
+
+                <select name="scope" class="form-select" style="max-width: 220px;">
+                    <option value="legacy" {% if filter_scope == 'legacy' %}selected{% endif %}>Buku Lama (Legacy Sahaja)</option>
+                    <option value="all" {% if filter_scope == 'all' %}selected{% endif %}>Semua Eksemplar di Rak</option>
+                </select>
+
+                <button type="submit" class="btn btn-outline-primary px-3 py-2 fw-semibold">
+                    Filter
+                </button>
+
+                {% if filter_search or filter_lokasi_rak or filter_scope != 'legacy' %}
+                <a href="{{ url_for('admin_labels_tanpa_label') }}" class="btn btn-link text-decoration-none text-muted px-2">
+                    <i class="bi bi-x-circle"></i> Reset
+                </a>
+                {% endif %}
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <span class="badge bg-secondary-subtle text-secondary px-3 py-2 fs-7 fw-semibold border">
+                    Ditemukan: {{ total_candidates }} Eksemplar
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Konten Tabel atau Empty State -->
+    {% if not candidates %}
+    <div class="card border-0 shadow-sm rounded-4 p-4 text-center my-4">
+        <div class="py-5">
+            <div class="mb-3 text-muted">
+                <i class="bi bi-check2-circle" style="font-size: 3.5rem; color: #10B981;"></i>
+            </div>
+            <h5 class="fw-bold text-dark">Tidak Ada Eksemplar yang Ditemukan</h5>
+            <p class="text-muted mb-4" style="max-width: 480px; margin: 0 auto; font-size: 0.95rem;">
+                Tidak ada eksemplar yang cocok dengan kriteria filter saat ini. Seluruh eksemplar lama mungkin telah diperiksa atau silakan ubah kata kunci pencarian Anda.
+            </p>
+            <div class="d-flex justify-content-center gap-2">
+                <a href="{{ url_for('admin_labels_tanpa_label') }}?scope=all" class="btn btn-primary px-3 py-2 fw-semibold">
+                    <i class="bi bi-list-check"></i> Tampilkan Semua Eksemplar
+                </a>
+                <a href="{{ url_for('admin_labels') }}" class="btn btn-outline-secondary px-3 py-2 fw-semibold">
+                    <i class="bi bi-grid-3x3"></i> Halaman Semua Label
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+
+    <!-- Form Pemilihan & Cetak Massal Eksemplar -->
+    <form method="POST" action="{{ url_for('admin_labels_reprint') }}" id="formCetakTerpilih">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+            <div class="d-flex align-items-center gap-2">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)">
+                    <label class="form-check-label fw-semibold text-secondary small" for="selectAllCheckbox">
+                        Pilih Semua di Halaman Ini
+                    </label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-xs" id="btnCetakTerpilih">
+                <i class="bi bi-printer"></i> Cetak Label untuk Eksemplar Terpilih
+            </button>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-4">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-secondary small text-uppercase">
+                        <tr>
+                            <th style="width: 40px;" class="text-center">#</th>
+                            <th style="width: 140px;">ID Eksemplar</th>
+                            <th style="width: 130px;">Reg. Lama</th>
+                            <th>Judul Buku & Penulis</th>
+                            <th style="width: 120px;">Lokasi Rak</th>
+                            <th style="width: 120px;">No. Panggil</th>
+                            <th style="width: 90px;" class="text-center">Status</th>
+                            <th style="width: 120px;" class="text-end">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in candidates %}
+                        <tr>
+                            <td class="text-center">
+                                <input class="form-check-input copy-checkbox" type="checkbox" name="copy_ids" value="{{ c.copy_id }}">
+                            </td>
+                            <td>
+                                <span class="font-monospace fw-bold text-dark fs-7">{{ c.copy_id }}</span>
+                            </td>
+                            <td>
+                                {% if c.legacy_ref %}
+                                <span class="badge bg-light text-secondary border font-monospace">{{ c.legacy_ref }}</span>
+                                {% else %}
+                                <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="fw-bold text-dark text-truncate" style="max-width: 320px;" title="{{ c.full_title }}">
+                                    {{ c.full_title }}
+                                </div>
+                                <div class="text-muted small">
+                                    {{ c.penulis or 'Tanpa Penulis' }}
+                                    {% if c.kategori %} &bull; <span class="badge bg-light text-secondary border-0 p-0">{{ c.kategori }}</span>{% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if c.lokasi_rak %}
+                                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">{{ c.lokasi_rak }}</span>
+                                {% else %}
+                                <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="text-muted small font-monospace">{{ c.call_number or '-' }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    {{ c.copy_status }}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <a href="{{ url_for('admin_labels') }}?copy_id={{ c.copy_id }}" class="btn btn-sm btn-outline-primary fw-semibold d-inline-flex align-items-center gap-1 shadow-xs" title="Cetak Label QR">
+                                        <i class="bi bi-printer"></i> Cetak
+                                    </a>
+                                    <a href="{{ url_for('admin_copy_deactivate', copy_id=c.copy_id) }}" class="btn btn-sm btn-outline-danger fw-semibold d-inline-flex align-items-center gap-1 shadow-xs" title="Nonaktifkan Eksemplar">
+                                        <i class="bi bi-slash-circle"></i> Nonaktifkan
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center px-1 mb-4">
+            <span class="text-muted small">
+                Menampilkan {{ candidates|length }} eksemplar siap verifikasi.
+            </span>
+            <button type="submit" class="btn btn-primary px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-xs">
+                <i class="bi bi-printer"></i> Cetak Label untuk Eksemplar Terpilih
+            </button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+function toggleSelectAll(master) {
+    var checkboxes = document.querySelectorAll('.copy-checkbox');
+    for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = master.checked;
+    }
+}
+</script>
+{% endblock %}

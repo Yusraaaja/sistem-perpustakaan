@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Sistem E-Perpus</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -382,6 +383,363 @@
                 max-width: 90vw;
             }
         }
+
+        /* SraX AI Agent — floating assistant */
+        .srax-ai-root {
+            position: fixed;
+            right: max(1rem, env(safe-area-inset-right));
+            bottom: calc(max(1rem, env(safe-area-inset-bottom)) + var(--srax-kb, 0px));
+            z-index: 1040;
+            width: 56px;
+            height: 56px;
+            pointer-events: none;
+        }
+        .srax-ai-root > * {
+            pointer-events: auto;
+        }
+
+        .srax-ai-fab {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 56px;
+            height: 56px;
+            border: 0;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #4F46E5 0%, #3730A3 100%);
+            color: #fff;
+            box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            cursor: pointer;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+        .srax-ai-fab:hover {
+            transform: translateY(-1px) scale(1.04);
+            box-shadow: 0 10px 28px rgba(79, 70, 229, 0.42);
+        }
+        .srax-ai-fab:focus-visible {
+            outline: 2px solid #4F46E5;
+            outline-offset: 3px;
+        }
+        .srax-ai-fab.is-open {
+            background: linear-gradient(145deg, #4338CA 0%, #312E81 100%);
+        }
+
+        .srax-ai-bubble {
+            position: absolute;
+            right: 0;
+            bottom: calc(56px + 12px);
+            width: min(340px, 100vw - 96px);
+            max-width: calc(100vw - 96px);
+            z-index: 2;
+            background: #FFFFFF;
+            color: #0F172A;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 0.8125rem;
+            line-height: 1.5;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+            opacity: 0;
+            transform: translateY(8px);
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
+        }
+        .srax-ai-bubble.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+            visibility: visible;
+            pointer-events: auto;
+        }
+        .srax-ai-bubble::after {
+            content: "";
+            position: absolute;
+            right: 18px;
+            bottom: -8px;
+            width: 14px;
+            height: 14px;
+            background: #FFFFFF;
+            border-right: 1px solid #E2E8F0;
+            border-bottom: 1px solid #E2E8F0;
+            transform: rotate(45deg);
+        }
+        .srax-ai-bubble-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #312E81;
+        }
+        .srax-ai-bubble-text {
+            color: #475569;
+            margin: 0;
+        }
+
+        .srax-ai-panel {
+            position: absolute;
+            right: 0;
+            bottom: calc(56px + 12px);
+            width: min(400px, calc(100vw - 24px));
+            height: min(620px, calc(var(--srax-vvh, 100dvh) - 96px));
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.16);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translateY(14px) scale(0.98);
+            transform-origin: bottom right;
+            transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+        }
+        .srax-ai-panel.is-open {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateY(0) scale(1);
+        }
+
+        .srax-ai-header {
+            padding: 12px 14px;
+            background: linear-gradient(135deg, #EEF2FF 0%, #F8FAFC 100%);
+            border-bottom: 1px solid #E2E8F0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .srax-ai-header-copy h2 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin: 0;
+            color: #0F172A;
+        }
+        .srax-ai-header-copy p {
+            margin: 0;
+            font-size: 0.75rem;
+            color: #64748B;
+        }
+        .srax-ai-close {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #E2E8F0;
+            background: #FFFFFF;
+            border-radius: 10px;
+            color: #475569;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .srax-ai-close:hover {
+            background: #F8FAFC;
+            color: #0F172A;
+        }
+        .srax-ai-close:focus-visible {
+            outline: 2px solid #4F46E5;
+            outline-offset: 2px;
+        }
+
+        .srax-ai-chat-area {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: #F8FAFC;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .ai-msg {
+            display: flex;
+            gap: 8px;
+            max-width: 92%;
+            animation: sraxMsgIn 0.22s ease;
+        }
+        .ai-msg-bot { align-self: flex-start; }
+        .ai-msg-user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .ai-msg-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .ai-msg-bot .ai-msg-avatar {
+            background-color: #EEF2FF;
+            color: #4F46E5;
+            border: 1px solid #C7D2FE;
+        }
+        .ai-msg-user .ai-msg-avatar {
+            background-color: #E2E8F0;
+            color: #475569;
+        }
+        .ai-msg-bubble {
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            line-height: 1.55;
+            word-break: break-word;
+        }
+        .ai-msg-bot .ai-msg-bubble {
+            background-color: #FFFFFF;
+            color: #0F172A;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+            border-top-left-radius: 4px;
+        }
+        .ai-msg-user .ai-msg-bubble {
+            background-color: #4F46E5;
+            color: #FFFFFF;
+            border-top-right-radius: 4px;
+        }
+
+        .srax-md-title {
+            font-weight: 700;
+            font-size: 0.92rem;
+            margin: 0 0 6px;
+            color: #0F172A;
+        }
+        .srax-md-p {
+            margin: 0 0 6px;
+        }
+        .srax-md-p:last-child,
+        .srax-md-title:last-child {
+            margin-bottom: 0;
+        }
+        .srax-md-list {
+            margin: 0 0 6px;
+            padding-left: 1.1rem;
+        }
+        .srax-md-list li {
+            margin: 0 0 4px;
+        }
+
+        .ai-recommended-books {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .ai-book-card {
+            background-color: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+            animation: sraxMsgIn 0.25s ease;
+        }
+        .ai-book-card:hover {
+            background-color: #EEF2FF;
+            border-color: #C7D2FE;
+            box-shadow: 0 1px 4px rgba(79, 70, 229, 0.08);
+        }
+
+        .srax-ai-composer {
+            border-top: 1px solid #E2E8F0;
+            background: #FFFFFF;
+            padding: 10px 12px 12px;
+        }
+        .srax-ai-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .ai-prompt-chip {
+            font-size: 0.72rem;
+            font-weight: 500;
+            padding: 6px 10px;
+            min-height: 32px;
+            border-radius: 20px;
+            background-color: #FFFFFF;
+            color: #4F46E5;
+            border: 1px solid #C7D2FE;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+        .ai-prompt-chip:hover,
+        .ai-prompt-chip:focus-visible {
+            background-color: #EEF2FF;
+            color: #3730A3;
+            border-color: #818CF8;
+        }
+        .srax-ai-form {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+        .srax-ai-form .form-control {
+            min-height: 42px;
+        }
+        #aiSendBtn {
+            min-width: 44px;
+            min-height: 44px;
+        }
+
+        .ai-loading-dots span {
+            animation: aiBlink 1.4s infinite both;
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #4F46E5;
+            margin: 0 2px;
+        }
+        .ai-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .ai-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes aiBlink {
+            0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes sraxMsgIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 576px) {
+            .srax-ai-panel {
+                width: calc(100vw - 16px);
+                height: calc(var(--srax-vvh, 100dvh) - 88px);
+                max-height: none;
+            }
+            .srax-ai-bubble {
+                width: calc(100vw - 88px);
+                max-width: calc(100vw - 88px);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .srax-ai-fab,
+            .srax-ai-bubble,
+            .srax-ai-panel,
+            .ai-msg,
+            .ai-book-card,
+            .ai-loading-dots span {
+                transition: none !important;
+                animation: none !important;
+                transform: none !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -399,6 +757,9 @@
                 <a class="nav-link" href="/"><i class="bi bi-search"></i> Cari Buku</a>
                 <a class="nav-link" href="/koleksi"><i class="bi bi-database"></i> Database</a>
                 <a class="nav-link" href="/peminjaman"><i class="bi bi-person-lines-fill"></i> Peminjaman</a>
+                {% if session.get('logged_in') %}
+                <a class="nav-link" href="/admin/members"><i class="bi bi-people"></i> Anggota</a>
+                {% endif %}
             </div>
             <div class="navbar-nav ms-auto align-items-lg-center gap-2 mt-2 mt-lg-0">
                 {% if session.get('logged_in') %}
@@ -435,6 +796,62 @@
     {% block content %}
     {% endblock %}
 
+</div>
+
+<div id="srax-ai-root" class="srax-ai-root">
+    <div id="sraxAiBubble" class="srax-ai-bubble" role="status" aria-hidden="true">
+        <div class="srax-ai-bubble-title">Halo! SraX AI Agent sudah tersedia.</div>
+        <p class="srax-ai-bubble-text">Bingung mau mencari buku yang mana? Atau mau memilih buku yang cocok? Yuk tanyakan ke SraX AI.</p>
+    </div>
+
+    <section id="sraxAiPanel" class="srax-ai-panel" role="dialog" aria-modal="true" aria-labelledby="sraxAiTitle" aria-hidden="true">
+        <div class="srax-ai-header">
+            <div class="d-flex align-items-center gap-2">
+                <span class="d-inline-flex align-items-center justify-content-center rounded-3 bg-primary text-white" style="width: 36px; height: 36px;">
+                    <i class="bi bi-stars" aria-hidden="true"></i>
+                </span>
+                <div class="srax-ai-header-copy">
+                    <h2 id="sraxAiTitle">SraX AI Agent</h2>
+                    <p>Asisten Perpustakaan</p>
+                </div>
+            </div>
+            <button type="button" id="sraxAiClose" class="srax-ai-close" aria-label="Tutup SraX AI Agent">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <div class="srax-ai-chat-area" id="aiChatArea">
+            <div class="ai-msg ai-msg-bot">
+                <div class="ai-msg-avatar"><i class="bi bi-stars" aria-hidden="true"></i></div>
+                <div class="ai-msg-bubble">
+                    Halo! Saya SraX AI Agent, asisten katalog perpustakaan. Tanyakan topik, penulis, atau minta rekomendasi dari koleksi yang tersedia.
+                </div>
+            </div>
+        </div>
+
+        <div class="srax-ai-composer">
+            <div class="srax-ai-chips" aria-label="Contoh pertanyaan">
+                <button type="button" class="ai-prompt-chip" data-prompt="Saya ingin belajar Python untuk pemula">Belajar Python Pemula</button>
+                <button type="button" class="ai-prompt-chip" data-prompt="Ada buku tentang pengembangan diri?">Pengembangan Diri</button>
+                <button type="button" class="ai-prompt-chip" data-prompt="Apakah ada buku karya Andrea Hirata?">Karya Andrea Hirata</button>
+                <button type="button" class="ai-prompt-chip" data-prompt="Rekomendasi buku jaringan komputer">Jaringan Komputer</button>
+            </div>
+            <form id="aiChatForm" class="srax-ai-form">
+                <label class="visually-hidden" for="aiUserInput">Pertanyaan untuk SraX AI Agent</label>
+                <input type="text" id="aiUserInput" class="form-control rounded-3 shadow-none"
+                       placeholder="Tanyakan buku atau topik..."
+                       maxlength="300" autocomplete="off" required>
+                <button type="submit" id="aiSendBtn" class="btn btn-primary rounded-3 d-inline-flex align-items-center justify-content-center shadow-sm flex-shrink-0" aria-label="Kirim pertanyaan">
+                    <span id="aiBtnText"><i class="bi bi-send-fill" aria-hidden="true"></i></span>
+                    <span id="aiBtnSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <button type="button" id="sraxAiFab" class="srax-ai-fab" aria-label="Buka SraX AI Agent" aria-expanded="false" aria-controls="sraxAiPanel" title="SraX AI Agent">
+        <i class="bi bi-stars" aria-hidden="true"></i>
+    </button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -778,5 +1195,480 @@
         });
     })();
 </script>
+<script>
+    (function() {
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+        const STORAGE_BUBBLE = 'srax_ai_intro';
+        const STORAGE_BUBBLE_COUNT = 'srax_ai_intro_count';
+
+        const fab = document.getElementById('sraxAiFab');
+        const panel = document.getElementById('sraxAiPanel');
+        const closeBtn = document.getElementById('sraxAiClose');
+        const bubble = document.getElementById('sraxAiBubble');
+        const chatForm = document.getElementById('aiChatForm');
+        const chatInput = document.getElementById('aiUserInput');
+        const chatArea = document.getElementById('aiChatArea');
+        const sendBtn = document.getElementById('aiSendBtn');
+        const btnText = document.getElementById('aiBtnText');
+        const btnSpinner = document.getElementById('aiBtnSpinner');
+        const promptChips = document.querySelectorAll('.ai-prompt-chip');
+
+        if (!fab || !panel || !chatForm || !chatArea) return;
+
+        let panelOpen = false;
+        let lastFocus = null;
+        let typewriterTimer = null;
+        let typewriterGen = 0;
+        let pendingFlush = null;
+        let busy = false;
+        let bubbleHideTimer = null;
+        let bubbleReturnTimer = null;
+
+        function prefersReducedMotion() {
+            return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        }
+
+        function scrollChat() {
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function setBusy(isBusy) {
+            busy = isBusy;
+            sendBtn.disabled = isBusy;
+            chatInput.disabled = isBusy;
+            promptChips.forEach(function(chip) { chip.disabled = isBusy; });
+            if (isBusy) {
+                btnText.classList.add('d-none');
+                btnSpinner.classList.remove('d-none');
+            } else {
+                btnText.classList.remove('d-none');
+                btnSpinner.classList.add('d-none');
+            }
+        }
+
+        function hideBubble(persist) {
+            if (!bubble) return;
+            bubble.classList.remove('is-visible');
+            bubble.setAttribute('aria-hidden', 'true');
+            if (bubbleHideTimer) {
+                clearTimeout(bubbleHideTimer);
+                bubbleHideTimer = null;
+            }
+            if (persist) {
+                try { sessionStorage.setItem(STORAGE_BUBBLE, '1'); } catch (e) {}
+            }
+        }
+
+        function showBubble() {
+            if (!bubble || panelOpen) return;
+            bubble.classList.add('is-visible');
+            bubble.setAttribute('aria-hidden', 'false');
+            if (bubbleHideTimer) clearTimeout(bubbleHideTimer);
+            bubbleHideTimer = setTimeout(function() {
+                hideBubble(true);
+            }, 8000);
+        }
+
+        function scheduleBubble() {
+            let seen = false;
+            try { seen = sessionStorage.getItem(STORAGE_BUBBLE) === '1'; } catch (e) {}
+            const firstDelay = seen ? 180000 : (prefersReducedMotion() ? 200 : 700);
+            setTimeout(function() {
+                if (panelOpen) return;
+                let count = 0;
+                try { count = parseInt(sessionStorage.getItem(STORAGE_BUBBLE_COUNT) || '0', 10) || 0; } catch (e) {}
+                if (count >= 2) return;
+                showBubble();
+                try { sessionStorage.setItem(STORAGE_BUBBLE_COUNT, String(seen ? Math.max(2, count + 1) : 1)); } catch (e) {}
+            }, firstDelay);
+            if (!seen) {
+                bubbleReturnTimer = setTimeout(function() {
+                    if (panelOpen) return;
+                    let count = 0;
+                    try { count = parseInt(sessionStorage.getItem(STORAGE_BUBBLE_COUNT) || '0', 10) || 0; } catch (e) {}
+                    if (count >= 2) return;
+                    try { sessionStorage.setItem(STORAGE_BUBBLE_COUNT, '2'); } catch (e) {}
+                    showBubble();
+                }, 180000);
+            }
+        }
+
+        function openPanel() {
+            lastFocus = document.activeElement;
+            panelOpen = true;
+            panel.classList.add('is-open');
+            panel.setAttribute('aria-hidden', 'false');
+            fab.classList.add('is-open');
+            fab.setAttribute('aria-expanded', 'true');
+            fab.setAttribute('aria-label', 'Tutup SraX AI Agent');
+            hideBubble(true);
+            window.setTimeout(function() {
+                chatInput.focus();
+            }, prefersReducedMotion() ? 0 : 180);
+        }
+
+        function closePanel() {
+            panelOpen = false;
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden', 'true');
+            fab.classList.remove('is-open');
+            fab.setAttribute('aria-expanded', 'false');
+            fab.setAttribute('aria-label', 'Buka SraX AI Agent');
+            if (lastFocus && typeof lastFocus.focus === 'function') {
+                lastFocus.focus();
+            } else {
+                fab.focus();
+            }
+        }
+
+        function togglePanel() {
+            if (panelOpen) closePanel();
+            else openPanel();
+        }
+
+        function appendInlineFormatted(text, parent) {
+            const source = String(text || '');
+            const re = /\*\*(.+?)\*\*|\*(.+?)\*/g;
+            let last = 0;
+            let match;
+            while ((match = re.exec(source)) !== null) {
+                if (match.index > last) {
+                    parent.appendChild(document.createTextNode(source.slice(last, match.index)));
+                }
+                const el = document.createElement(match[1] != null ? 'strong' : 'em');
+                el.textContent = match[1] != null ? match[1] : match[2];
+                parent.appendChild(el);
+                last = match.index + match[0].length;
+            }
+            if (last < source.length) {
+                parent.appendChild(document.createTextNode(source.slice(last)));
+            }
+        }
+
+        function renderAiMarkdown(raw, container) {
+            while (container.firstChild) container.removeChild(container.firstChild);
+            const lines = String(raw || '').replace(/\r\n/g, '\n').split('\n');
+            let listEl = null;
+            lines.forEach(function(line) {
+                const bullet = line.match(/^\s*(?:\*|\-|\u2022)\s+(.+)$/);
+                if (bullet) {
+                    if (!listEl) {
+                        listEl = document.createElement('ul');
+                        listEl.className = 'srax-md-list';
+                        container.appendChild(listEl);
+                    }
+                    const li = document.createElement('li');
+                    appendInlineFormatted(bullet[1], li);
+                    listEl.appendChild(li);
+                    return;
+                }
+                listEl = null;
+                if (!line.trim()) return;
+                const heading = /^\s*\*\*.+\*\*\s*$/.test(line);
+                const p = document.createElement(heading ? 'p' : 'p');
+                p.className = heading ? 'srax-md-title' : 'srax-md-p';
+                appendInlineFormatted(line.trim(), p);
+                container.appendChild(p);
+            });
+        }
+
+        function safeBookId(id) {
+            const n = String(id == null ? '' : id);
+            return /^\d+$/.test(n) ? n : '';
+        }
+
+        function safeCoverUrl(url) {
+            if (!url) return '';
+            const s = String(url);
+            if (s.charAt(0) === '/' && s.indexOf('//') !== 0) return s;
+            if (s.indexOf('https://') === 0 || s.indexOf('http://') === 0) return s;
+            return '';
+        }
+
+        function buildBookCards(books) {
+            const wrap = document.createElement('div');
+            wrap.className = 'ai-recommended-books';
+            if (!books || !books.length) return wrap;
+            books.forEach(function(b) {
+                const id = safeBookId(b.id);
+                if (!id) return;
+                const card = document.createElement('div');
+                card.className = 'ai-book-card';
+
+                const left = document.createElement('div');
+                left.className = 'd-flex align-items-center gap-2 text-truncate me-2';
+
+                const coverUrl = safeCoverUrl(b.cover_url);
+                if (coverUrl) {
+                    const img = document.createElement('img');
+                    img.src = coverUrl;
+                    img.alt = '';
+                    img.style.cssText = 'width:36px;height:48px;object-fit:cover;border-radius:6px;';
+                    left.appendChild(img);
+                } else {
+                    const ph = document.createElement('div');
+                    ph.className = 'd-flex align-items-center justify-content-center rounded bg-primary-subtle text-primary';
+                    ph.style.cssText = 'width:36px;height:48px;';
+                    ph.innerHTML = '<i class="bi bi-book" aria-hidden="true"></i>';
+                    left.appendChild(ph);
+                }
+
+                const meta = document.createElement('div');
+                meta.className = 'text-truncate';
+                const title = document.createElement('div');
+                title.className = 'fw-semibold text-dark text-truncate';
+                title.style.fontSize = '0.8125rem';
+                title.textContent = b.judul || 'Buku';
+                const sub = document.createElement('div');
+                sub.className = 'text-muted text-truncate';
+                sub.style.fontSize = '0.725rem';
+                const stokNum = Number(b.stok);
+                const stokLabel = stokNum > 0 ? ('Stok: ' + stokNum) : 'Habis';
+                sub.textContent = (b.penulis || '-') + ' · ' + stokLabel;
+                meta.appendChild(title);
+                meta.appendChild(sub);
+                left.appendChild(meta);
+
+                const link = document.createElement('a');
+                link.href = '/buku/' + id;
+                link.className = 'btn btn-outline-primary btn-sm px-2 py-1 text-nowrap rounded-2';
+                link.style.fontSize = '0.75rem';
+                link.textContent = 'Lihat Buku';
+
+                card.appendChild(left);
+                card.appendChild(link);
+                wrap.appendChild(card);
+            });
+            return wrap;
+        }
+
+        function makeBotShell() {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'ai-msg ai-msg-bot';
+            const avatar = document.createElement('div');
+            avatar.className = 'ai-msg-avatar';
+            avatar.innerHTML = '<i class="bi bi-stars" aria-hidden="true"></i>';
+            const bubbleEl = document.createElement('div');
+            bubbleEl.className = 'ai-msg-bubble';
+            const body = document.createElement('div');
+            body.className = 'srax-ai-answer';
+            bubbleEl.appendChild(body);
+            msgDiv.appendChild(avatar);
+            msgDiv.appendChild(bubbleEl);
+            chatArea.appendChild(msgDiv);
+            return { msgDiv: msgDiv, bubbleEl: bubbleEl, body: body };
+        }
+
+        function appendUserMessage(msg) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'ai-msg ai-msg-user';
+            const avatar = document.createElement('div');
+            avatar.className = 'ai-msg-avatar';
+            avatar.innerHTML = '<i class="bi bi-person-fill" aria-hidden="true"></i>';
+            const bubbleEl = document.createElement('div');
+            bubbleEl.className = 'ai-msg-bubble';
+            bubbleEl.textContent = msg;
+            msgDiv.appendChild(avatar);
+            msgDiv.appendChild(bubbleEl);
+            chatArea.appendChild(msgDiv);
+            scrollChat();
+        }
+
+        function appendLoadingMessage() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'ai-msg ai-msg-bot';
+            loadingDiv.id = 'aiLoadingBubble';
+            const avatar = document.createElement('div');
+            avatar.className = 'ai-msg-avatar';
+            avatar.innerHTML = '<i class="bi bi-stars" aria-hidden="true"></i>';
+            const bubbleEl = document.createElement('div');
+            bubbleEl.className = 'ai-msg-bubble text-muted';
+            const label = document.createElement('span');
+            label.className = 'small me-2';
+            label.textContent = 'Sedang mencari di katalog...';
+            const dots = document.createElement('span');
+            dots.className = 'ai-loading-dots';
+            dots.setAttribute('aria-hidden', 'true');
+            dots.innerHTML = '<span></span><span></span><span></span>';
+            bubbleEl.appendChild(label);
+            bubbleEl.appendChild(dots);
+            loadingDiv.appendChild(avatar);
+            loadingDiv.appendChild(bubbleEl);
+            chatArea.appendChild(loadingDiv);
+            scrollChat();
+            return loadingDiv;
+        }
+
+        function flushPending() {
+            if (!pendingFlush) return;
+            const item = pendingFlush;
+            pendingFlush = null;
+            renderAiMarkdown(item.fullText, item.body);
+            if (item.books && item.books.length && !item.body.parentNode.querySelector('.ai-recommended-books')) {
+                item.body.parentNode.appendChild(buildBookCards(item.books));
+            }
+            scrollChat();
+        }
+
+        function typewriteAnswer(fullText, books, gen) {
+            return new Promise(function(resolve) {
+                const shell = makeBotShell();
+                pendingFlush = { body: shell.body, fullText: fullText, books: books || [] };
+
+                function finish() {
+                    if (gen !== typewriterGen) {
+                        resolve();
+                        return;
+                    }
+                    renderAiMarkdown(fullText, shell.body);
+                    if (books && books.length) {
+                        shell.bubbleEl.appendChild(buildBookCards(books));
+                    }
+                    pendingFlush = null;
+                    scrollChat();
+                    resolve();
+                }
+
+                if (prefersReducedMotion() || !fullText) {
+                    finish();
+                    return;
+                }
+
+                const chunks = fullText.match(/\S+\s*/g) || [fullText];
+                let i = 0;
+                const stepMs = chunks.length > 80 ? 12 : 18;
+
+                function step() {
+                    if (gen !== typewriterGen) {
+                        resolve();
+                        return;
+                    }
+                    i = Math.min(i + 2, chunks.length);
+                    renderAiMarkdown(chunks.slice(0, i).join(''), shell.body);
+                    scrollChat();
+                    if (i < chunks.length) {
+                        typewriterTimer = window.setTimeout(step, stepMs);
+                    } else {
+                        typewriterTimer = null;
+                        finish();
+                    }
+                }
+                step();
+            });
+        }
+
+        function appendErrorMessage(message) {
+            const shell = makeBotShell();
+            shell.body.textContent = message || 'Maaf, terjadi kendala saat memproses pertanyaan Anda.';
+            scrollChat();
+        }
+
+        async function sendQuery(queryText) {
+            if (!queryText || !queryText.trim() || busy) return;
+            queryText = queryText.trim();
+            if (typewriterTimer) {
+                clearTimeout(typewriterTimer);
+                typewriterTimer = null;
+            }
+            flushPending();
+            typewriterGen += 1;
+            const gen = typewriterGen;
+
+            if (!panelOpen) openPanel();
+            appendUserMessage(queryText);
+            chatInput.value = '';
+            setBusy(true);
+            const loadingBubble = appendLoadingMessage();
+
+            try {
+                const response = await fetch('/api/ai_chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ message: queryText, csrf_token: csrfToken })
+                });
+
+                if (loadingBubble && loadingBubble.parentNode) {
+                    loadingBubble.parentNode.removeChild(loadingBubble);
+                }
+
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch (_) {
+                    data = {};
+                }
+
+                if (gen !== typewriterGen) return;
+
+                if (response.ok && data.status === 'success') {
+                    await typewriteAnswer(data.answer || '', data.books || [], gen);
+                } else {
+                    const safeMsg = data.message || 'Maaf, terjadi kendala saat memproses pertanyaan Anda.';
+                    appendErrorMessage(safeMsg);
+                }
+            } catch (err) {
+                if (loadingBubble && loadingBubble.parentNode) {
+                    loadingBubble.parentNode.removeChild(loadingBubble);
+                }
+                if (gen === typewriterGen) {
+                    appendErrorMessage('Tidak dapat terhubung ke server perpustakaan. Silakan periksa jaringan Anda.');
+                }
+            } finally {
+                if (gen === typewriterGen) {
+                    setBusy(false);
+                    chatInput.focus();
+                }
+            }
+        }
+
+        fab.addEventListener('click', togglePanel);
+        closeBtn.addEventListener('click', closePanel);
+        if (bubble) {
+            bubble.addEventListener('click', function() {
+                hideBubble(true);
+                openPanel();
+            });
+            bubble.style.cursor = 'pointer';
+        }
+
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            sendQuery(chatInput.value);
+        });
+
+        promptChips.forEach(function(chip) {
+            chip.addEventListener('click', function() {
+                const prompt = this.getAttribute('data-prompt');
+                if (prompt) sendQuery(prompt);
+            });
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && panelOpen) {
+                e.preventDefault();
+                closePanel();
+            }
+        });
+
+        function syncVisualViewport() {
+            var vv = window.visualViewport;
+            if (!vv) return;
+            var kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+            document.documentElement.style.setProperty('--srax-vvh', vv.height + 'px');
+            document.documentElement.style.setProperty('--srax-kb', kb + 'px');
+        }
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncVisualViewport);
+            window.visualViewport.addEventListener('scroll', syncVisualViewport);
+            syncVisualViewport();
+        }
+
+        scheduleBubble();
+    })();
+</script>
 </body>
-</html>
+</html>

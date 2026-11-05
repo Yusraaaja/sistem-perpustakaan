@@ -1,0 +1,277 @@
+{% extends 'layout.html' %}
+
+{% block title %}Ringkasan Hasil Impor Katalog - Sistem Perpustakaan Digital{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+
+        <!-- Header Halaman & Breadcrumb -->
+        <div class="mb-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2 small">
+                    <li class="breadcrumb-item"><a href="/koleksi" class="text-decoration-none">Koleksi</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('panduan_impor_katalog') }}" class="text-decoration-none">Impor Katalog</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Ringkasan Hasil</li>
+                </ol>
+            </nav>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h4 fw-bold text-dark mb-1">Ringkasan Hasil Impor Katalog</h2>
+                    <p class="text-muted small mb-0">
+                        Laporan akhir eksekusi komit transaksi atomik impor katalog massal (Task 3-07).
+                    </p>
+                </div>
+                <div>
+                    {% if is_replay %}
+                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-2 small">
+                            <i class="bi bi-arrow-repeat me-1"></i> Hasil Replay Idempoten
+                        </span>
+                    {% else %}
+                        <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 small">
+                            <i class="bi bi-check-circle-fill me-1"></i> Transaksi Berhasil (Atomik)
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Banner Status -->
+        {% if is_replay %}
+            <div class="alert alert-warning border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #FEF3C7; color: #D97706; width: 40px; height: 40px; flex-shrink: 0;">
+                        <i class="bi bi-info-circle-fill fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-warning-emphasis mb-1">Permintaan Replay Terdeteksi (Idempoten)</h6>
+                        <p class="small text-warning-emphasis mb-0" style="line-height: 1.55;">
+                            Token konfirmasi ini telah sukses diproses sebelumnya. Sistem mengembalikan ringkasan transaksi sebelumnya secara konsisten tanpa menduplikasi judul atau eksemplar buku.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-success border-0 shadow-sm rounded-4 p-4 mb-4" role="alert">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="rounded-3 d-flex align-items-center justify-content-center p-2 mt-1" style="background-color: #DCFCE7; color: #16A34A; width: 40px; height: 40px; flex-shrink: 0;">
+                        <i class="bi bi-check2-circle fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-success-emphasis mb-1">Komit Impor Massal Selesai</h6>
+                        <p class="small text-success-emphasis mb-0" style="line-height: 1.55;">
+                            Seluruh data valid berhasil ditulis ke database secara atomik. Perubahan telah dicatat pada <code>audit_log</code>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- 4 KARTU METRIK RESMI -->
+        <div class="row g-3 mb-4">
+            <!-- 1. Judul Baru -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-4 border-success">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Judul Baru</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #DCFCE7; color: #16A34A; width: 34px; height: 34px;">
+                            <i class="bi bi-journal-plus"></i>
+                        </div>
+                    </div>
+                    <div class="fs-2 fw-bold text-success">{{ summary.titles_created_count }}</div>
+                    <div class="text-muted small" style="font-size: 0.78rem;">Judul katalog unik baru dibuat</div>
+                </div>
+            </div>
+
+            <!-- 2. Eksemplar Dibuat -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-4 border-primary">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Eksemplar Dibuat</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #EEF2FF; color: #4F46E5; width: 34px; height: 34px;">
+                            <i class="bi bi-bookshelf"></i>
+                        </div>
+                    </div>
+                    <div class="fs-2 fw-bold text-primary">{{ summary.copies_created_count }}</div>
+                    <div class="text-muted small" style="font-size: 0.78rem;">Eksemplar fisik siap dipinjam</div>
+                </div>
+            </div>
+
+            <!-- 3. Baris Dilewati -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-4 border-warning">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Baris Dilewati</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #FEF3C7; color: #D97706; width: 34px; height: 34px;">
+                            <i class="bi bi-skip-forward-fill"></i>
+                        </div>
+                    </div>
+                    <div class="fs-2 fw-bold text-warning">{{ summary.skipped_rows_count }}</div>
+                    <div class="text-muted small" style="font-size: 0.78rem;">Sengaja tidak diproses</div>
+                </div>
+            </div>
+
+            <!-- 4. Baris Bermasalah -->
+            <div class="col-sm-6 col-md-3">
+                <div class="card app-card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-4 border-danger">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-medium">Baris Bermasalah</span>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="background-color: #FEE2E2; color: #DC2626; width: 34px; height: 34px;">
+                            <i class="bi bi-x-octagon-fill"></i>
+                        </div>
+                    </div>
+                    <div class="fs-2 fw-bold text-danger">{{ summary.problematic_rows_count }}</div>
+                    <div class="text-muted small" style="font-size: 0.78rem;">Gagal validasi / tidak diimpor</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Catatan Hubungan Judul dan Eksemplar -->
+        <div class="card app-card border-0 shadow-sm rounded-4 p-3 mb-4 bg-light">
+            <div class="d-flex align-items-center gap-2 small text-secondary">
+                <i class="bi bi-info-circle text-primary"></i>
+                <span><strong>Catatan Konseptual:</strong> Satu judul katalog dapat memiliki lebih dari satu eksemplar fisik unik (DEC-004, DEC-013). Jumlah judul ({{ summary.titles_created_count }}) tidak sama dengan jumlah eksemplar ({{ summary.copies_created_count }}).</span>
+            </div>
+        </div>
+
+        <!-- Tabel Rincian Judul yang Dibuat -->
+        {% if summary.created_titles %}
+            <div class="card app-card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+                <div class="card-header bg-white py-3 px-4 border-0 d-flex align-items-center justify-content-between">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>Daftar Judul Katalog yang Berhasil Dibuat ({{ summary.created_titles|length }})
+                    </h6>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small">Tersimpan di DB</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle small mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4" style="width: 15%;">ID Judul</th>
+                                <th style="width: 35%;">Judul Buku</th>
+                                <th style="width: 25%;">Penulis</th>
+                                <th style="width: 15%;">ISBN</th>
+                                <th class="text-center pe-4" style="width: 10%;">Eksemplar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in summary.created_titles %}
+                                <tr>
+                                    <td class="ps-4 fw-bold">
+                                        <code class="text-dark bg-light px-2 py-0.5 rounded border">{{ t.title_id }}</code>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">{{ t.judul }}</div>
+                                        <div class="text-muted" style="font-size: 0.76rem;">Kategori: {{ t.kategori }}</div>
+                                    </td>
+                                    <td class="text-secondary">{{ t.penulis }}</td>
+                                    <td>
+                                        {% if t.isbn %}
+                                            <code class="text-dark bg-light px-1 py-0.5 rounded">{{ t.isbn }}</code>
+                                        {% else %}
+                                            <span class="text-muted fst-italic">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center pe-4">
+                                        <span class="badge rounded-pill bg-primary-subtle text-primary fw-bold px-2.5 py-1">
+                                            {{ t.copies_count }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Baris Dilewati (Jika Ada) -->
+        {% if summary.skipped_details %}
+            <div class="card app-card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+                <div class="card-header bg-white py-3 px-4 border-0">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-skip-forward-fill text-warning me-2"></i>Daftar Baris yang Dilewati ({{ summary.skipped_details|length }})
+                    </h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle small mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4" style="width: 10%;">Baris</th>
+                                <th style="width: 40%;">Judul Buku</th>
+                                <th style="width: 50%;">Alasan Dilewati</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in summary.skipped_details %}
+                                <tr>
+                                    <td class="ps-4 fw-bold text-secondary">Baris {{ s.row_num }}</td>
+                                    <td class="fw-medium text-dark">{{ s.judul }}</td>
+                                    <td class="text-warning-emphasis">
+                                        {{ s.reason }}
+                                        {% if s.warnings %}
+                                            <div class="text-muted" style="font-size: 0.76rem;">{{ s.warnings|join('; ') }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Baris Bermasalah (Jika Ada) -->
+        {% if summary.problematic_details %}
+            <div class="card app-card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+                <div class="card-header bg-white py-3 px-4 border-0">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-x-octagon-fill text-danger me-2"></i>Daftar Baris Bermasalah yang Tidak Diimpor ({{ summary.problematic_details|length }})
+                    </h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle small mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4" style="width: 10%;">Baris</th>
+                                <th style="width: 35%;">Judul Mentah</th>
+                                <th style="width: 55%;">Penyebab Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in summary.problematic_details %}
+                                <tr>
+                                    <td class="ps-4 fw-bold text-secondary">Baris {{ p.row_num }}</td>
+                                    <td class="fw-medium text-dark">{{ p.judul }}</td>
+                                    <td>
+                                        {% for err in p.errors %}
+                                            <div class="text-danger small"><i class="bi bi-x-circle me-1"></i>{{ err }}</div>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Navigasi Aksi Pasca-Impor -->
+        <div class="card app-card border-0 shadow-sm rounded-4 p-4 bg-white mb-5">
+            <h6 class="fw-bold text-dark mb-3">Langkah Selanjutnya</h6>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="/koleksi" class="btn btn-primary px-4 py-2.5 fw-semibold d-inline-flex align-items-center gap-2 rounded-3 shadow-sm">
+                    <i class="bi bi-grid-3x3-gap-fill"></i> Buka Halaman Koleksi Katalog
+                </a>
+                <a href="/admin/labels" class="btn btn-outline-success px-3 py-2.5 fw-semibold rounded-3 d-inline-flex align-items-center gap-2">
+                    <i class="bi bi-qr-code"></i> Cetak Label QR Eksemplar
+                </a>
+                <a href="{{ url_for('panduan_impor_katalog') }}" class="btn btn-outline-secondary px-3 py-2.5 fw-semibold rounded-3">
+                    Impor Berkas Lainnya
+                </a>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
